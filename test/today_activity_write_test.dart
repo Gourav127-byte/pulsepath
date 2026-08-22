@@ -8,8 +8,12 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pulsepath/core/network/api_client.dart';
 import 'package:pulsepath/core/theme/pulse_path_theme.dart';
+import 'package:pulsepath/features/journey/models/activity_history_entry.dart';
+import 'package:pulsepath/features/journey/providers/activity_history_provider.dart';
 import 'package:pulsepath/features/today/data/today_activity_repository.dart';
 import 'package:pulsepath/features/today/presentation/today_screen.dart';
+import 'package:pulsepath/features/today/providers/health_sync_provider.dart';
+import 'package:pulsepath/features/today/services/health_connect_service.dart';
 
 void main() {
   group('TodayActivityRepository update', () {
@@ -74,6 +78,155 @@ void main() {
   });
 
   group('manual activity edit UI', () {
+    testWidgets(
+      'empty-state actions wrap without overflow on a narrow screen',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 806);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final client = MockClient((request) async {
+          if (request.url.path == '/profile') {
+            return http.Response(
+              '{"id":"profile-id","display_name":"Mira",'
+              '"subtitle":"","dark_theme":true,"reduce_motion":false,'
+              '"haptic_feedback":true,"use_metric_units":true}',
+              200,
+            );
+          }
+          if (request.url.path == '/activity/today') {
+            return http.Response(
+              _activityJson(
+                steps: 0,
+                activeMinutes: 0,
+                calories: 0,
+                distance: 0,
+                score: 0,
+                recordingStatus: 'unrecorded',
+              ),
+              200,
+            );
+          }
+          if (request.url.path == '/activity/history' ||
+              request.url.path == '/goals') {
+            return http.Response('[]', 200);
+          }
+          if (request.url.path == '/activity/streak') {
+            return http.Response(
+              '{"current_streak":0,"today_pending":true}',
+              200,
+            );
+          }
+          if (request.url.path == '/activity/engagement') {
+            return http.Response(
+              '{"current_streak":0,"best_streak":0,"today_pending":true,'
+              '"achievements":[]}',
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(
+                ApiClient(baseUrl: 'http://example.test', client: client),
+              ),
+              healthConnectServiceProvider.overrideWithValue(
+                _PermissionDeniedHealthService(),
+              ),
+              activityHistoryProvider(7).overrideWith(
+                (ref) => Completer<List<ActivityHistoryEntry>>().future,
+              ),
+            ],
+            child: MaterialApp(
+              theme: PulsePathTheme.dark,
+              home: const Scaffold(body: TodayScreen()),
+            ),
+          ),
+        );
+        for (var i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        await tester.tap(find.byKey(const Key('sync_health_button')));
+        for (var i = 0; i < 3; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        expect(find.text('Quick log'), findsOneWidget);
+        expect(find.text('Setup Health Connect'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'recorded header keeps its title readable with Health Connect setup',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 806);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final container = ProviderContainer(
+          overrides: [
+            apiClientProvider.overrideWithValue(
+              ApiClient(
+                baseUrl: 'http://example.test',
+                client: MockClient((request) {
+                  if (request.url.path == '/activity/today') {
+                    return Future.value(
+                      http.Response(
+                        _activityJson(source: 'health_connect'),
+                        200,
+                      ),
+                    );
+                  }
+                  return _standardHandler(request);
+                }),
+              ),
+            ),
+            healthConnectServiceProvider.overrideWithValue(
+              _PermissionDeniedHealthService(),
+            ),
+            activityHistoryProvider(7).overrideWith(
+              (ref) => Completer<List<ActivityHistoryEntry>>().future,
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: PulsePathTheme.dark,
+              home: const Scaffold(body: TodayScreen()),
+            ),
+          ),
+        );
+        for (var i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        await container.read(healthSyncControllerProvider.notifier).sync();
+        for (var i = 0; i < 3; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        expect(find.text("Today's activity"), findsOneWidget);
+        expect(
+          tester.getSize(find.text("Today's activity")).width,
+          greaterThan(100),
+        );
+        expect(find.text('Setup Health Connect'), findsOneWidget);
+        expect(find.text('Health Connect'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('unrecorded day offers Quick log and confirms a real zero', (
       tester,
     ) async {
@@ -324,6 +477,19 @@ void main() {
   });
 }
 
+class _PermissionDeniedHealthService implements HealthConnectService {
+  @override
+  Future<HealthSyncResult> fetchDailyData() async {
+    throw const HealthConnectPermissionException();
+  }
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<bool> requestPermissions() async => false;
+}
+
 Future<http.Response> _standardHandler(http.Request request) async {
   if (request.url.path == '/activity/history') {
     return http.Response('[]', 200);
@@ -391,6 +557,7 @@ String _activityJson({
   num distance = 5.6,
   num score = 77,
   String recordingStatus = 'recorded',
+  String source = 'manual',
 }) {
   return jsonEncode({
     'date': '2026-08-09',
@@ -400,7 +567,7 @@ String _activityJson({
     'calories': calories,
     'daily_score': score,
     'score_version': 'v2',
-    'source': 'manual',
+    'source': source,
     'recording_status': recordingStatus,
   });
 }

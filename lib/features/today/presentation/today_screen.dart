@@ -166,8 +166,11 @@ class _UnrecordedActivityContent extends StatelessWidget {
                 style: TextStyle(color: PulsePathColors.textSecondary),
               ),
               const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   FilledButton.icon(
                     key: const Key('quick_log_activity_button'),
@@ -175,7 +178,6 @@ class _UnrecordedActivityContent extends StatelessWidget {
                     icon: const Icon(Icons.add_rounded),
                     label: const Text('Quick log'),
                   ),
-                  const SizedBox(width: 8),
                   const _HealthSyncIndicator(),
                 ],
               ),
@@ -371,12 +373,11 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final titleRow = Row(
       children: [
         Expanded(
           child: Text(title, style: Theme.of(context).textTheme.titleLarge),
         ),
-        ?trailing,
         if (onEdit != null)
           IconButton(
             key: const Key('edit_activity_button'),
@@ -385,25 +386,48 @@ class _SectionTitle extends StatelessWidget {
             onPressed: onEdit,
             icon: const Icon(Icons.edit_outlined, size: 20),
           ),
-        if (action != null) ...[
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: action == 'Health Connect'
-                  ? Colors.teal
-                  : PulsePathColors.cyan,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            action!,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: PulsePathColors.textSecondary,
-            ),
-          ),
-        ],
+      ],
+    );
+
+    if (trailing == null && action == null) return titleRow;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        titleRow,
+        const SizedBox(height: 6),
+        Wrap(
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 10,
+          runSpacing: 6,
+          children: [
+            ?trailing,
+            if (action != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: action == 'Health Connect'
+                          ? Colors.teal
+                          : PulsePathColors.cyan,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    action!,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: PulsePathColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -605,7 +629,8 @@ class _HealthSyncIndicator extends ConsumerWidget {
         color = Colors.redAccent;
         break;
       case HealthSyncStatus.success:
-        if (syncState.message != null && syncState.message!.contains('No Health')) {
+        if (syncState.message != null &&
+            syncState.message!.contains('No Health')) {
           label = 'No new data';
         } else {
           label = 'Synced just now';
@@ -672,11 +697,15 @@ class _HealthSyncIndicator extends ConsumerWidget {
                 else
                   Icon(icon, size: 14, color: color),
                 const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],

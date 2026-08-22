@@ -108,6 +108,15 @@ void main() {
       expect(outcome, HealthSyncOutcome.noData);
     });
 
+    test('genuine zero records are PATCHed and do not return noData', () async {
+      healthService.result = const HealthSyncResult(steps: 0.0);
+
+      final outcome = await syncRepo.sync();
+
+      expect(activityRepo.lastPatch, {'steps': 0.0});
+      expect(outcome, HealthSyncOutcome.updated);
+    });
+
     test('4. Partial metric availability sends only found data', () async {
       healthService.result = const HealthSyncResult(
         steps: 5000,

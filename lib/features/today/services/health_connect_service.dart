@@ -68,7 +68,7 @@ class AndroidHealthConnectService implements HealthConnectService {
       throw const HealthConnectPermissionException();
     }
 
-    final steps = await _health.getTotalStepsInInterval(startOfDay, now);
+    final rawSteps = await _health.getTotalStepsInInterval(startOfDay, now);
 
     // health removes exact duplicate records. Cross-source overlapping records
     // cannot be safely reconciled without source precedence rules.
@@ -80,8 +80,12 @@ class AndroidHealthConnectService implements HealthConnectService {
 
     double? distance;
     double? calories;
+    bool hasStepRecords = false;
 
     for (final point in data) {
+      if (point.type == HealthDataType.STEPS) {
+        hasStepRecords = true;
+      }
       final value = point.value;
       if (value is! NumericHealthValue) continue;
       if (point.type == HealthDataType.DISTANCE_DELTA) {
@@ -92,7 +96,7 @@ class AndroidHealthConnectService implements HealthConnectService {
     }
 
     return HealthSyncResult(
-      steps: steps?.toDouble(),
+      steps: hasStepRecords ? (rawSteps?.toDouble() ?? 0.0) : null,
       // Convert distance from meters to km. Calories are active energy only.
       distance: distance != null ? distance / 1000 : null,
       calories: calories,
