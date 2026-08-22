@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -100,7 +100,7 @@ def register(
         db.add(
             Activity(
                 user_id=user.id,
-                date=datetime.now(timezone.utc).date(),
+                date=date.today(),
                 steps=0,
                 active_minutes=0,
                 calories=0,

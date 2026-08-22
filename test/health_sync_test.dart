@@ -38,6 +38,7 @@ class MockActivityRepository implements TodayActivityRepository {
     double? activeMinutes,
     double? calories,
     double? distance,
+    String source = 'manual',
   }) async {
     if (isUnauthorized) {
       throw const NetworkException('Unauthorized', statusCode: 401);

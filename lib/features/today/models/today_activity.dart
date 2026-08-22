@@ -8,6 +8,7 @@ class TodayActivity {
     required this.dailyScore,
     required this.scoreVersion,
     required this.source,
+    this.recordingStatus = ActivityRecordingStatus.legacyUnknown,
   });
 
   factory TodayActivity.fromJson(Map<String, dynamic> json) {
@@ -20,6 +21,9 @@ class TodayActivity {
       dailyScore: (json['daily_score'] as num).toDouble(),
       scoreVersion: json['score_version'] as String,
       source: json['source'] as String,
+      recordingStatus: ActivityRecordingStatus.fromJson(
+        json['recording_status'] as String? ?? 'legacy_unknown',
+      ),
     );
   }
 
@@ -31,4 +35,21 @@ class TodayActivity {
   final double dailyScore;
   final String scoreVersion;
   final String source;
+  final ActivityRecordingStatus recordingStatus;
+
+  bool get isRecorded => recordingStatus != ActivityRecordingStatus.unrecorded;
+}
+
+enum ActivityRecordingStatus {
+  unrecorded,
+  recorded,
+  legacyUnknown;
+
+  static ActivityRecordingStatus fromJson(String value) {
+    return switch (value) {
+      'unrecorded' => unrecorded,
+      'recorded' => recorded,
+      _ => legacyUnknown,
+    };
+  }
 }

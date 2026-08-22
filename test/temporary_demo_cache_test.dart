@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:pulsepath/core/cache/temporary_demo_cache.dart';
 import 'package:pulsepath/core/network/api_client.dart';
 import 'package:pulsepath/features/goals/data/goals_repository.dart';
+import 'package:pulsepath/features/journey/data/activity_history_repository.dart';
 import 'package:pulsepath/features/profile/data/profile_repository.dart';
 import 'package:pulsepath/features/today/data/today_activity_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,7 @@ void main() {
     'daily_score': 77.0,
     'score_version': 'v1',
     'source': 'manual',
+    'recording_status': 'recorded',
   };
   const goalsJson = <Map<String, dynamic>>[
     {
@@ -51,6 +53,7 @@ void main() {
         '/activity/today' => http.Response(jsonEncode(todayJson), 200),
         '/goals' => http.Response(jsonEncode(goalsJson), 200),
         '/profile' => http.Response(jsonEncode(profileJson), 200),
+        '/activity/history' => http.Response(jsonEncode([todayJson]), 200),
         _ => http.Response('', 404),
       };
     });
@@ -68,45 +71,73 @@ void main() {
     await TodayActivityRepository(onlineApi, cache).fetchTodayActivity();
     await GoalsRepository(onlineApi, cache).fetchGoals();
     await ProfileRepository(onlineApi, cache).fetchProfile();
+    await ActivityHistoryRepository(onlineApi, cache).fetchHistory(days: 7);
 
     final cachedToday = await TodayActivityRepository(
       offlineApi,
       cache,
+      () => DateTime(2026, 8, 10),
     ).fetchTodayActivity();
     final cachedGoals = await GoalsRepository(offlineApi, cache).fetchGoals();
     final cachedProfile = await ProfileRepository(
       offlineApi,
       cache,
     ).fetchProfile();
+    final cachedHistory = await ActivityHistoryRepository(
+      offlineApi,
+      cache,
+    ).fetchHistory(days: 7);
 
     expect(cachedToday.steps, 7842);
     expect(cachedGoals.single.progress, 0.7842);
     expect(cachedProfile.displayName, 'Alex');
+    expect(cachedHistory.single.steps, 7842);
   });
 
-  test('scopes cache by userId to prevent data leakage between users', () async {
-    const cacheA = TemporaryDemoCache(userId: 'user-a');
-    const cacheB = TemporaryDemoCache(userId: 'user-b');
+  test(
+    'scopes cache by userId to prevent data leakage between users',
+    () async {
+      const cacheA = TemporaryDemoCache(userId: 'user-a');
+      const cacheB = TemporaryDemoCache(userId: 'user-b');
 
-    await cacheA.saveToday({...todayJson, 'steps': 5000.0});
-    await cacheB.saveToday({...todayJson, 'steps': 10000.0});
+      await cacheA.saveToday({...todayJson, 'steps': 5000.0});
+      await cacheB.saveToday({...todayJson, 'steps': 10000.0});
+      await cacheA.saveHistory(7, [todayJson]);
 
-    final loadedA = await cacheA.loadToday();
-    final loadedB = await cacheB.loadToday();
+      final loadedA = await cacheA.loadToday();
+      final loadedB = await cacheB.loadToday();
 
-    expect(loadedA?['steps'], 5000.0);
-    expect(loadedB?['steps'], 10000.0);
+      expect(loadedA?['steps'], 5000.0);
+      expect(loadedB?['steps'], 10000.0);
+      expect(await cacheB.loadHistory(7), isNull);
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.containsKey('temporary_demo_today:user-a'), isTrue);
-    expect(prefs.containsKey('temporary_demo_today:user-b'), isTrue);
-  });
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('temporary_demo_today:user-a'), isTrue);
+      expect(prefs.containsKey('temporary_demo_today:user-b'), isTrue);
+    },
+  );
 
   test('network failure without cached data remains an error', () async {
     final offlineClient = MockClient((_) async => http.Response('', 503));
     final repository = TodayActivityRepository(
       ApiClient(baseUrl: 'http://example.test', client: offlineClient),
       const TemporaryDemoCache(),
+    );
+
+    await expectLater(
+      repository.fetchTodayActivity(),
+      throwsA(isA<NetworkException>()),
+    );
+  });
+
+  test('previous-day Today cache is rejected after a date change', () async {
+    const cache = TemporaryDemoCache();
+    await cache.saveToday(todayJson);
+    final offlineClient = MockClient((_) async => http.Response('', 503));
+    final repository = TodayActivityRepository(
+      ApiClient(baseUrl: 'http://example.test', client: offlineClient),
+      cache,
+      () => DateTime(2026, 8, 11),
     );
 
     await expectLater(

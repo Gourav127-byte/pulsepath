@@ -11,6 +11,7 @@ class TemporaryDemoCache {
   static const _todayKey = 'temporary_demo_today';
   static const _goalsKey = 'temporary_demo_goals';
   static const _profileKey = 'temporary_demo_profile';
+  static const _historyKey = 'temporary_demo_history';
 
   String _scoped(String key) => userId == null ? key : '$key:$userId';
 
@@ -42,6 +43,20 @@ class TemporaryDemoCache {
 
   Future<Map<String, dynamic>?> loadProfile() {
     return _loadMap(_profileKey);
+  }
+
+  Future<void> saveHistory(int days, List<Map<String, dynamic>> json) {
+    return _save('$_historyKey:$days', json);
+  }
+
+  Future<List<Map<String, dynamic>>?> loadHistory(int days) async {
+    final decoded = await _load('$_historyKey:$days');
+    if (decoded is! List) return null;
+    try {
+      return decoded.cast<Map<String, dynamic>>();
+    } on TypeError {
+      return null;
+    }
   }
 
   Future<void> _save(String key, Object json) async {

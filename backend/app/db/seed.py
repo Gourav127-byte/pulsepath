@@ -70,7 +70,8 @@ def seed_data(session: Session) -> SeedCounts:
                     calories=324,
                 ),
                 score_version=SCORE_VERSION,
-                source="manual",
+            source="manual",
+            recording_status="recorded",
             )
         )
 

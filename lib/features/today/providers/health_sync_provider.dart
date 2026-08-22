@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../journey/providers/activity_history_provider.dart';
 import '../data/health_sync_repository.dart';
 import '../services/health_connect_service.dart';
 import 'today_activity_provider.dart';
@@ -33,6 +34,8 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
   final Ref _ref;
 
   Future<void> sync() async {
+    if (state.status == HealthSyncStatus.syncing) return;
+
     if (defaultTargetPlatform != TargetPlatform.android) {
       state = const HealthSyncState(
         status: HealthSyncStatus.error,
@@ -74,6 +77,12 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
 
       // Refresh the Today activity provider to show new data
       _ref.invalidate(todayActivityProvider);
+      _ref.invalidate(activityStreakProvider);
+      _ref.invalidate(activityEngagementProvider);
+      if (outcome == HealthSyncOutcome.updated) {
+        _ref.invalidate(activityHistoryProvider(7));
+        _ref.invalidate(activityHistoryProvider(30));
+      }
     } on HealthConnectPermissionException {
       state = HealthSyncState(
         status: HealthSyncStatus.unauthorized,

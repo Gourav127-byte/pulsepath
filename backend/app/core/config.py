@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 24
     expose_password_reset_token: bool = False
+    cors_allowed_origins: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def reject_development_secret_outside_development(self) -> "Settings":

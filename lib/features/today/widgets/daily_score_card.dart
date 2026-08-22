@@ -8,6 +8,7 @@ class DailyScoreCard extends StatelessWidget {
   const DailyScoreCard({
     required this.score,
     required this.streakDays,
+    this.onExplain,
     super.key,
   }) : onRetry = null,
        isLoading = false;
@@ -15,17 +16,20 @@ class DailyScoreCard extends StatelessWidget {
   const DailyScoreCard.loading({super.key})
     : score = null,
       streakDays = null,
+      onExplain = null,
       onRetry = null,
       isLoading = true;
 
   const DailyScoreCard.error({required this.onRetry, super.key})
     : score = null,
       streakDays = null,
+      onExplain = null,
       isLoading = false;
 
   final int? score;
   final int? streakDays;
   final VoidCallback? onRetry;
+  final VoidCallback? onExplain;
   final bool isLoading;
 
   @override
@@ -80,7 +84,10 @@ class DailyScoreCard extends StatelessWidget {
             score: score!,
             size: compact ? 130 : 150,
           );
-          final summary = _ScoreSummary(streakDays: streakDays!);
+          final summary = _ScoreSummary(
+            streakDays: streakDays,
+            onExplain: onExplain,
+          );
 
           if (compact) {
             return Column(
@@ -102,9 +109,10 @@ class DailyScoreCard extends StatelessWidget {
 }
 
 class _ScoreSummary extends StatelessWidget {
-  const _ScoreSummary({required this.streakDays});
+  const _ScoreSummary({required this.streakDays, required this.onExplain});
 
-  final int streakDays;
+  final int? streakDays;
+  final VoidCallback? onExplain;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +125,15 @@ class _ScoreSummary extends StatelessWidget {
           'You are moving steadily toward your daily goals.',
           style: TextStyle(color: PulsePathColors.textSecondary, height: 1.45),
         ),
+        if (onExplain != null) ...[
+          const SizedBox(height: 6),
+          TextButton(
+            key: const Key('explain_daily_score_button'),
+            onPressed: onExplain,
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            child: const Text('Why this score?'),
+          ),
+        ],
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
@@ -127,14 +144,18 @@ class _ScoreSummary extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.local_fire_department_rounded,
+              Icon(
+                streakDays == null
+                    ? Icons.history_toggle_off_rounded
+                    : Icons.local_fire_department_rounded,
                 size: 18,
                 color: PulsePathColors.violet,
               ),
               const SizedBox(width: 7),
               Text(
-                '$streakDays day streak',
+                streakDays == null
+                    ? 'Streak unavailable'
+                    : '$streakDays day streak',
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ],

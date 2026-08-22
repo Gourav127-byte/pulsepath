@@ -38,6 +38,7 @@ def test_today_activity_returns_seeded_values_and_score(mock_user_token: str) ->
         "daily_score": 77.0,
         "score_version": "v1",
         "source": "manual",
+        "recording_status": "recorded",
     }
 
 

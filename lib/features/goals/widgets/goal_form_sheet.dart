@@ -38,6 +38,9 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
   ActivityMetricType? _selectedType;
   bool _isSaving = false;
   String? _saveError;
+  double? _selectedPreset;
+
+  static const _stepPresets = [5000.0, 10000.0, 20000.0];
 
   @override
   void initState() {
@@ -46,6 +49,16 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
       text: widget.goal == null ? '' : _format(widget.goal!.targetValue),
     );
     _selectedType = widget.availableTypes.firstOrNull;
+
+    if (widget.goal != null && widget.goal!.type == ActivityMetricType.steps) {
+      if (_stepPresets.contains(widget.goal!.targetValue)) {
+        _selectedPreset = widget.goal!.targetValue;
+      }
+    } else if (widget.goal == null &&
+        _selectedType == ActivityMetricType.steps) {
+      _selectedPreset = 10000.0;
+      _targetController.text = '10000';
+    }
   }
 
   @override
@@ -54,8 +67,25 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
     super.dispose();
   }
 
+  void _onTypeChanged(ActivityMetricType? type) {
+    setState(() {
+      _selectedType = type;
+      if (type == ActivityMetricType.steps) {
+        _selectedPreset = 10000.0;
+        _targetController.text = '10000';
+      } else {
+        _selectedPreset = null;
+        _targetController.text = '';
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentType = widget.goal?.type ?? _selectedType;
+    final isSteps = currentType == ActivityMetricType.steps;
+    final showCustomField = !isSteps || _selectedPreset == null;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -106,34 +136,90 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
                       for (final type in widget.availableTypes)
                         DropdownMenuItem(value: type, child: Text(type.label)),
                     ],
-                    onChanged: _isSaving
-                        ? null
-                        : (value) => setState(() => _selectedType = value),
+                    onChanged: _isSaving ? null : _onTypeChanged,
                     validator: (value) =>
                         value == null ? 'Choose a goal type' : null,
                   ),
                 const SizedBox(height: 14),
-                if (widget.goal == null) ...[
+
+                if (isSteps) ...[
                   Text('Target', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final preset in _stepPresets)
+                        ChoiceChip(
+                          key: Key('preset_${preset.toInt()}'),
+                          label: Text(_format(preset)),
+                          selected: _selectedPreset == preset,
+                          onSelected: _isSaving
+                              ? null
+                              : (selected) {
+                                  if (selected) {
+                                    setState(() {
+                                      _selectedPreset = preset;
+                                      _targetController.text = _format(preset);
+                                    });
+                                  }
+                                },
+                        ),
+                      ChoiceChip(
+                        key: const Key('preset_custom'),
+                        label: const Text('Custom'),
+                        selected: _selectedPreset == null,
+                        onSelected: _isSaving
+                            ? null
+                            : (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedPreset = null;
+                                    if (_stepPresets.contains(
+                                      double.tryParse(_targetController.text),
+                                    )) {
+                                      _targetController.text = '';
+                                    }
+                                  });
+                                }
+                              },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
                 ],
-                TextFormField(
-                  key: const Key('target_value_field'),
-                  controller: _targetController,
-                  enabled: !_isSaving,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: true,
+
+                if (!isSteps) ...[
+                  if (widget.goal == null) ...[
+                    Text(
+                      'Target',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+
+                if (showCustomField)
+                  TextFormField(
+                    key: const Key('target_value_field'),
+                    controller: _targetController,
+                    enabled: !_isSaving,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      labelText: widget.goal == null
+                          ? 'Target'
+                          : 'Target value',
+                      hintText: 'Enter a value greater than zero',
+                      suffixText: (widget.goal?.type ?? _selectedType)?.unit,
+                    ),
+                    validator: _validateTarget,
+                    onFieldSubmitted: (_) => _submit(),
                   ),
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: widget.goal == null ? 'Target' : 'Target value',
-                    hintText: 'Enter a value greater than zero',
-                    suffixText: (widget.goal?.type ?? _selectedType)?.unit,
-                  ),
-                  validator: _validateTarget,
-                  onFieldSubmitted: (_) => _submit(),
-                ),
+
                 if (_saveError != null) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -166,6 +252,7 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
   }
 
   String? _validateTarget(String? rawValue) {
+    if (_selectedPreset != null) return null;
     final value = rawValue?.trim() ?? '';
     if (value.isEmpty) return 'Target is required';
 
@@ -185,7 +272,8 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
       _saveError = null;
     });
     try {
-      final parsedUserInputTarget = double.parse(_targetController.text.trim());
+      final parsedUserInputTarget =
+          _selectedPreset ?? double.parse(_targetController.text.trim());
       if (widget.goal == null) {
         await widget.onCreate!(_selectedType!, parsedUserInputTarget);
       } else {

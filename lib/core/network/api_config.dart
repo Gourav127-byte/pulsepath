@@ -10,6 +10,8 @@ abstract final class ApiConfig {
       ? _developmentFallbackUrl
       : _configuredUrl;
 
+  static bool get hasConfiguredUrl => _configuredUrl.isNotEmpty;
+
   static void logDevelopmentFallbackWarning() {
     if (kDebugMode && _configuredUrl.isEmpty) {
       debugPrint(

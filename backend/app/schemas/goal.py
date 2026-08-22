@@ -18,7 +18,7 @@ class GoalCreate(BaseModel):
 class GoalUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    target_value: float = Field(gt=0, allow_inf_nan=False)
+    target_value: PositiveTarget
 
 
 class GoalResponse(BaseModel):

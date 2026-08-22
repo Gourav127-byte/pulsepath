@@ -7,6 +7,7 @@ class ManualActivityEditSheet extends StatefulWidget {
   const ManualActivityEditSheet({
     required this.activity,
     required this.onSave,
+    this.confirmUnchanged = false,
     super.key,
   });
 
@@ -18,6 +19,7 @@ class ManualActivityEditSheet extends StatefulWidget {
     double? distance,
   })
   onSave;
+  final bool confirmUnchanged;
 
   @override
   State<ManualActivityEditSheet> createState() =>
@@ -178,7 +180,8 @@ class _ManualActivityEditSheetState extends State<ManualActivityEditSheet> {
         ? distance
         : null;
 
-    if (changedSteps == null &&
+    if (!widget.confirmUnchanged &&
+        changedSteps == null &&
         changedActiveMinutes == null &&
         changedCalories == null &&
         changedDistance == null) {
@@ -192,7 +195,9 @@ class _ManualActivityEditSheetState extends State<ManualActivityEditSheet> {
     });
     try {
       await widget.onSave(
-        steps: changedSteps,
+        steps: widget.confirmUnchanged && changedSteps == null
+            ? steps
+            : changedSteps,
         activeMinutes: changedActiveMinutes,
         calories: changedCalories,
         distance: changedDistance,

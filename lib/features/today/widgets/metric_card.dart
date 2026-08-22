@@ -7,6 +7,7 @@ class MetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.goal,
+    this.goalDetail,
     required this.icon,
     required this.accent,
     this.unit,
@@ -16,6 +17,7 @@ class MetricCard extends StatelessWidget {
   final String label;
   final String value;
   final String goal;
+  final String? goalDetail;
   final IconData icon;
   final Color accent;
   final String? unit;
@@ -93,6 +95,10 @@ class MetricCard extends StatelessWidget {
               fontSize: 11,
             ),
           ),
+          if (goalDetail != null) ...[
+            const SizedBox(height: 2),
+            Text(goalDetail!, style: TextStyle(color: accent, fontSize: 11)),
+          ],
         ],
       ),
     );

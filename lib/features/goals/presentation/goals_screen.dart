@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/activity/activity_metric.dart';
 import '../../../core/theme/pulse_path_theme.dart';
+import '../../today/providers/today_activity_provider.dart';
 import '../models/backend_goal.dart';
 import '../providers/backend_goals_provider.dart';
 import '../widgets/delete_goal_dialog.dart';
@@ -96,6 +97,7 @@ class GoalsScreen extends ConsumerWidget {
               .read(goalsRepositoryProvider)
               .createGoal(type: type, targetValue: targetValue);
           ref.invalidate(backendGoalsProvider);
+          ref.invalidate(dailyScoreExplanationProvider);
           await ref.read(backendGoalsProvider.future);
         },
       ),
@@ -119,6 +121,7 @@ class GoalsScreen extends ConsumerWidget {
               .read(goalsRepositoryProvider)
               .updateGoalTarget(goalId: goal.id, targetValue: targetValue);
           ref.invalidate(backendGoalsProvider);
+          ref.invalidate(dailyScoreExplanationProvider);
           await ref.read(backendGoalsProvider.future);
         },
       ),
@@ -137,6 +140,7 @@ class GoalsScreen extends ConsumerWidget {
         onDelete: () async {
           await ref.read(goalsRepositoryProvider).deleteGoal(goal.id);
           ref.invalidate(backendGoalsProvider);
+          ref.invalidate(dailyScoreExplanationProvider);
           await ref.read(backendGoalsProvider.future);
         },
       ),

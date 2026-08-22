@@ -33,6 +33,7 @@ void main() {
         expect(request.method, 'PATCH');
         expect(request.url.path, '/activity/today');
         expect(jsonDecode(request.body), {
+          'source': 'manual',
           'steps': 9000.0,
           'active_minutes': 50.0,
         });
@@ -54,7 +55,7 @@ void main() {
 
       await repository.updateTodayActivity(distance: 6.2);
 
-      expect(body, {'distance': 6.2});
+      expect(body, {'distance': 6.2, 'source': 'manual'});
     });
 
     test('propagates networking failure cleanly', () async {
@@ -73,6 +74,87 @@ void main() {
   });
 
   group('manual activity edit UI', () {
+    testWidgets('unrecorded day offers Quick log and confirms a real zero', (
+      tester,
+    ) async {
+      var recorded = false;
+      Map<String, dynamic>? patchBody;
+      final client = MockClient((request) async {
+        if (request.url.path == '/activity/today' &&
+            request.method == 'PATCH') {
+          patchBody = jsonDecode(request.body) as Map<String, dynamic>;
+          recorded = true;
+          return http.Response(
+            _activityJson(
+              steps: 0,
+              activeMinutes: 0,
+              calories: 0,
+              distance: 0,
+              score: 0,
+              recordingStatus: 'recorded',
+            ),
+            200,
+          );
+        }
+        if (request.url.path == '/activity/today') {
+          return http.Response(
+            _activityJson(
+              steps: 0,
+              activeMinutes: 0,
+              calories: 0,
+              distance: 0,
+              score: 0,
+              recordingStatus: recorded ? 'recorded' : 'unrecorded',
+            ),
+            200,
+          );
+        }
+        if (request.url.path == '/activity/history' ||
+            request.url.path == '/goals') {
+          return http.Response('[]', 200);
+        }
+        if (request.url.path == '/activity/streak') {
+          return http.Response(
+            jsonEncode({
+              'current_streak': recorded ? 3 : 2,
+              'today_pending': !recorded,
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/activity/engagement') {
+          return http.Response(
+            jsonEncode({
+              'current_streak': recorded ? 3 : 2,
+              'best_streak': 5,
+              'today_pending': !recorded,
+              'achievements': const [],
+            }),
+            200,
+          );
+        }
+        return http.Response('not found', 404);
+      });
+      await _pumpToday(tester, client);
+
+      expect(
+        find.byKey(const Key('unrecorded_activity_state')),
+        findsOneWidget,
+      );
+      expect(find.text('No activity recorded yet'), findsOneWidget);
+      expect(find.text('Current · today pending'), findsOneWidget);
+      expect(find.text('Personal best'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('quick_log_activity_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('save_activity_button')));
+      await tester.pumpAndSettle();
+
+      expect(patchBody, {'steps': 0.0, 'source': 'manual'});
+      expect(find.byKey(const Key('unrecorded_activity_state')), findsNothing);
+      expect(find.text('0'), findsWidgets);
+      expect(find.text('3 day streak'), findsOneWidget);
+    });
+
     testWidgets('opens with authoritative backend values prefilled', (
       tester,
     ) async {
@@ -122,7 +204,7 @@ void main() {
       await tester.tap(find.byKey(const Key('save_activity_button')));
       await tester.pumpAndSettle();
 
-      expect(patchBody, {'steps': 9000.0});
+      expect(patchBody, {'steps': 9000.0, 'source': 'manual'});
       expect(activityGets, 2);
       expect(goalGets, 2);
       expect(find.text('9,000'), findsOneWidget);
@@ -243,10 +325,30 @@ void main() {
 }
 
 Future<http.Response> _standardHandler(http.Request request) async {
+  if (request.url.path == '/activity/history') {
+    return http.Response('[]', 200);
+  }
   if (request.url.path == '/activity/today') {
     return http.Response(_activityJson(), 200);
   }
   if (request.url.path == '/goals') return http.Response('[]', 200);
+  if (request.url.path == '/activity/streak') {
+    return http.Response(
+      jsonEncode({'current_streak': 1, 'today_pending': false}),
+      200,
+    );
+  }
+  if (request.url.path == '/activity/engagement') {
+    return http.Response(
+      jsonEncode({
+        'current_streak': 1,
+        'best_streak': 4,
+        'today_pending': false,
+        'achievements': const [],
+      }),
+      200,
+    );
+  }
   return http.Response('not found', 404);
 }
 
@@ -288,6 +390,7 @@ String _activityJson({
   num calories = 324,
   num distance = 5.6,
   num score = 77,
+  String recordingStatus = 'recorded',
 }) {
   return jsonEncode({
     'date': '2026-08-09',
@@ -298,5 +401,6 @@ String _activityJson({
     'daily_score': score,
     'score_version': 'v2',
     'source': 'manual',
+    'recording_status': recordingStatus,
   });
 }

@@ -10,12 +10,16 @@ extension ActivityMetricDetails on ActivityMetricType {
       ActivityMetricType.steps => 'Steps',
       ActivityMetricType.distance => 'Distance',
       ActivityMetricType.activeMinutes => 'Active minutes',
-      ActivityMetricType.calories => 'Calories',
+      ActivityMetricType.calories => 'Active calories',
     };
   }
 
   String get shortLabel {
-    return this == ActivityMetricType.activeMinutes ? 'Active' : label;
+    return switch (this) {
+      ActivityMetricType.activeMinutes => 'Active',
+      ActivityMetricType.calories => 'Active kcal',
+      _ => label,
+    };
   }
 
   String get unit {

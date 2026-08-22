@@ -26,7 +26,7 @@ void main() {
           '${_goal('steps', 10000, 7842)}]',
     );
 
-    final labels = ['Steps', 'Distance', 'Active minutes', 'Calories'];
+    final labels = ['Steps', 'Distance', 'Active minutes', 'Active calories'];
     final verticalPositions = [
       for (final label in labels) tester.getTopLeft(find.text(label)).dy,
     ];
@@ -187,6 +187,10 @@ void main() {
     await _pumpGoalsWithClient(tester, client);
     await tester.tap(find.byKey(const Key('add_goal_button')));
     await tester.pumpAndSettle();
+    if (find.byKey(const Key('preset_custom')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('preset_custom')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(find.byKey(const Key('target_value_field')), '8');
 
     await tester.tap(find.byKey(const Key('save_goal_button')));
@@ -220,6 +224,10 @@ void main() {
     await _pumpGoalsWithClient(tester, client);
     await tester.tap(find.byKey(const Key('add_goal_button')));
     await tester.pumpAndSettle();
+    if (find.byKey(const Key('preset_custom')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('preset_custom')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(find.byKey(const Key('target_value_field')), '8');
 
     await tester.tap(find.byKey(const Key('save_goal_button')));
@@ -423,6 +431,10 @@ void main() {
     expect(find.byKey(const Key('locked_goal_type')), findsOneWidget);
     expect(find.byKey(const Key('goal_type_dropdown')), findsNothing);
 
+    if (find.byKey(const Key('preset_custom')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('preset_custom')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(find.byKey(const Key('target_value_field')), '8000');
     await tester.tap(find.byKey(const Key('save_goal_button')));
     await tester.pumpAndSettle();
@@ -453,6 +465,10 @@ void main() {
     await _pumpGoalsWithClient(tester, client);
     await tester.tap(find.byKey(const Key('edit_goal_steps')));
     await tester.pumpAndSettle();
+    if (find.byKey(const Key('preset_custom')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('preset_custom')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(find.byKey(const Key('target_value_field')), '8000');
 
     await tester.tap(find.byKey(const Key('save_goal_button')));
@@ -484,6 +500,10 @@ void main() {
     await _pumpGoalsWithClient(tester, client);
     await tester.tap(find.byKey(const Key('edit_goal_steps')));
     await tester.pumpAndSettle();
+    if (find.byKey(const Key('preset_custom')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('preset_custom')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(find.byKey(const Key('target_value_field')), '8000');
 
     await tester.tap(find.byKey(const Key('save_goal_button')));
@@ -567,7 +587,7 @@ void main() {
   ) async {
     await _pumpGoals(tester, responseBody: '[${_goal('calories', 450, 324)}]');
 
-    expect(find.text('Calories'), findsOneWidget);
+    expect(find.text('Active calories'), findsOneWidget);
     expect(find.text('Steps'), findsNothing);
     expect(find.text('Distance'), findsNothing);
     expect(find.text('Active minutes'), findsNothing);

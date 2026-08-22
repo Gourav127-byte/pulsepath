@@ -116,7 +116,9 @@ class ApiClient {
 
   Future<void> delete(String path) async {
     final headers = await _buildHeaders();
-    await _send(() => _httpClient.delete(_baseUri.resolve(path), headers: headers));
+    await _send(
+      () => _httpClient.delete(_baseUri.resolve(path), headers: headers),
+    );
   }
 
   Future<List<Map<String, dynamic>>> getJsonList(String path) async {

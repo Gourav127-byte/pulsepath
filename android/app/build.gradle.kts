@@ -15,10 +15,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.pulsepath"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.pulsepath.app"
+        // Target minimum SDK 26 for Health Connect support and modern Android APIs
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -27,8 +25,9 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // For production release, configure a dedicated signingConfig keystore:
+            // https://docs.flutter.dev/deployment/android#signing-the-app
+            // Defaulting to debug keys for local testing / testing release builds.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

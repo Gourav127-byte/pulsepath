@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/pulse_path_theme.dart';
+import '../../journey/models/activity_history_entry.dart';
 
 class DailyProgressCard extends StatelessWidget {
-  const DailyProgressCard({super.key});
+  const DailyProgressCard({required this.history, super.key});
 
-  static const _days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  static const _progress = [0.55, 0.72, 0.46, 0.88, 0.64, 0.82, 0.0];
+  final List<ActivityHistoryEntry> history;
 
   @override
   Widget build(BuildContext context) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final byDate = {
+      for (final entry in history) DateUtils.dateOnly(entry.date): entry,
+    };
+    final days = List.generate(
+      7,
+      (index) => today.subtract(Duration(days: 6 - index)),
+    );
+    final recorded = days.where(byDate.containsKey).length;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
@@ -24,9 +34,11 @@ class DailyProgressCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('This week', style: Theme.of(context).textTheme.titleMedium),
-              const Text(
-                '5 of 7 active days',
-                style: TextStyle(
+              Text(
+                recorded == 0
+                    ? 'No activity recorded'
+                    : '$recorded recorded days',
+                style: const TextStyle(
                   color: PulsePathColors.textSecondary,
                   fontSize: 12,
                 ),
@@ -38,56 +50,75 @@ class DailyProgressCard extends StatelessWidget {
             height: 92,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(_days.length, (index) {
-                final isToday = index == 5;
-                return Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: FractionallySizedBox(
-                            heightFactor: _progress[index] == 0
-                                ? 0.06
-                                : _progress[index],
-                            child: Container(
-                              width: 8,
-                              decoration: BoxDecoration(
-                                color: isToday
-                                    ? PulsePathColors.cyan
-                                    : PulsePathColors.violet.withValues(
-                                        alpha: _progress[index] == 0
-                                            ? 0.2
-                                            : 0.65,
-                                      ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 9),
-                      Text(
-                        _days[index],
-                        style: TextStyle(
-                          color: isToday
-                              ? PulsePathColors.textPrimary
-                              : PulsePathColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: isToday
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ],
+              children: [
+                for (final day in days)
+                  Expanded(
+                    child: _DayBar(
+                      day: day,
+                      entry: byDate[day],
+                      isToday: day == today,
+                    ),
                   ),
-                );
-              }),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DayBar extends StatelessWidget {
+  const _DayBar({
+    required this.day,
+    required this.entry,
+    required this.isToday,
+  });
+
+  final DateTime day;
+  final ActivityHistoryEntry? entry;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = entry?.dailyScore.clamp(0, 100).toDouble();
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: score == null
+                ? Container(width: 8, height: 2, color: PulsePathColors.divider)
+                : FractionallySizedBox(
+                    heightFactor: score == 0 ? 0.04 : score / 100,
+                    child: Container(
+                      key: Key(
+                        'weekly_score_${day.toIso8601String().substring(0, 10)}',
+                      ),
+                      width: 8,
+                      decoration: BoxDecoration(
+                        color: isToday
+                            ? PulsePathColors.cyan
+                            : PulsePathColors.violet.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][day.weekday - 1],
+          style: TextStyle(
+            color: isToday
+                ? PulsePathColors.textPrimary
+                : PulsePathColors.textSecondary,
+            fontSize: 11,
+            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

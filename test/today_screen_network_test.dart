@@ -50,6 +50,8 @@ void main() {
           );
         case '/goals':
           return http.Response('[]', 200);
+        case '/activity/history':
+          return http.Response('[]', 200);
         case '/activity/today':
           activityRequestCount++;
           if (activityRequestCount == 1) {
@@ -79,7 +81,7 @@ void main() {
     expect(activityRequestCount, 2);
     expect(find.text('77'), findsOneWidget);
     expect(find.text('7,842'), findsOneWidget);
-    expect(find.text('8 day streak'), findsOneWidget);
+    expect(find.text('Streak unavailable'), findsOneWidget);
   });
 }
 

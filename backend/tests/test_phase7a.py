@@ -14,6 +14,7 @@ from app.db.models.goal import Goal
 from app.db.models.user import User
 from app.main import app
 from app.services.daily_score_v2 import calculate_daily_score_v2
+from app.services.auth import create_access_token
 
 
 def request(
@@ -45,11 +46,21 @@ def restore_activity_and_goals() -> Generator[None, None, None]:
             "id": activity.id,
             "user_id": activity.user_id,
             "steps": activity.steps,
+            "steps_manual": activity.steps_manual,
+            "steps_health_connect": activity.steps_health_connect,
             "active_minutes": activity.active_minutes,
+            "active_minutes_manual": activity.active_minutes_manual,
+            "active_minutes_health_connect": activity.active_minutes_health_connect,
             "calories": activity.calories,
+            "calories_manual": activity.calories_manual,
+            "calories_health_connect": activity.calories_health_connect,
             "distance": activity.distance,
+            "distance_manual": activity.distance_manual,
+            "distance_health_connect": activity.distance_health_connect,
             "daily_score": activity.daily_score,
             "score_version": activity.score_version,
+            "source": activity.source,
+            "recording_status": activity.recording_status,
         }
         goals = session.scalars(select(Goal).where(Goal.user_id == MOCK_USER_ID)).all()
         goal_snapshots = {
@@ -232,9 +243,7 @@ def test_forbidden_activity_fields_are_rejected(
     assert response.status_code == 422
 
 
-def test_missing_today_activity_returns_404_without_partial_write(
-    mock_user_token: str,
-) -> None:
+def test_missing_today_activity_is_created_by_first_partial_write() -> None:
     temporary_user_id = uuid.uuid4()
     with SessionLocal() as session:
         session.add(
@@ -244,29 +253,19 @@ def test_missing_today_activity_returns_404_without_partial_write(
                 password_hash="test-only-not-a-real-password-hash",
             )
         )
-        session.flush()
-        activity = session.scalar(
-            select(Activity).where(
-                Activity.user_id == MOCK_USER_ID,
-                Activity.date == date.today(),
-            )
-        )
-        assert activity is not None
-        activity.user_id = temporary_user_id
         session.commit()
 
     try:
+        token = create_access_token(temporary_user_id)
         response = request(
-            "PATCH", "/activity/today", {"steps": 9000}, token=mock_user_token
+            "PATCH", "/activity/today", {"steps": 9000}, token=token
         )
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json()["steps"] == 9000
+        assert response.json()["active_minutes"] == 0
+        assert response.json()["recording_status"] == "recorded"
     finally:
         with SessionLocal() as session:
-            activity = session.scalar(
-                select(Activity).where(Activity.user_id == temporary_user_id)
-            )
-            assert activity is not None
-            activity.user_id = MOCK_USER_ID
             temporary_user = session.get(User, temporary_user_id)
             assert temporary_user is not None
             session.delete(temporary_user)
