@@ -72,6 +72,9 @@ class MockTodayRepo implements TodayActivityRepository {
     double? calories,
     double? distance,
     String source = 'manual',
+    bool resetStepsToAuto = false,
+    bool resetDistanceToAuto = false,
+    bool resetCaloriesToAuto = false,
   }) async {
     throw UnimplementedError();
   }

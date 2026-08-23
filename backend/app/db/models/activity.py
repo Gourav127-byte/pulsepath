@@ -28,18 +28,34 @@ class Activity(Base):
     steps: Mapped[float] = mapped_column(Float, nullable=False)
     steps_manual: Mapped[float | None] = mapped_column(Float, nullable=True)
     steps_health_connect: Mapped[float | None] = mapped_column(Float, nullable=True)
+    steps_downward_offset: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0.0")
+    steps_provenance: Mapped[str] = mapped_column(String(32), nullable=False, default="system", server_default="'system'")
+    steps_pending_reduction_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    steps_pending_reduction_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     
     active_minutes: Mapped[float] = mapped_column(Float, nullable=False)
     active_minutes_manual: Mapped[float | None] = mapped_column(Float, nullable=True)
     active_minutes_health_connect: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Active minutes untouched per HC spec rules
+    @property
+    def active_minutes_provenance(self) -> str:
+        return "manual" if self.active_minutes_manual is not None else "system"
     
     distance: Mapped[float] = mapped_column(Float, nullable=False)
     distance_manual: Mapped[float | None] = mapped_column(Float, nullable=True)
     distance_health_connect: Mapped[float | None] = mapped_column(Float, nullable=True)
+    distance_downward_offset: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0.0")
+    distance_provenance: Mapped[str] = mapped_column(String(32), nullable=False, default="system", server_default="'system'")
+    distance_pending_reduction_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    distance_pending_reduction_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     
     calories: Mapped[float] = mapped_column(Float, nullable=False)
     calories_manual: Mapped[float | None] = mapped_column(Float, nullable=True)
     calories_health_connect: Mapped[float | None] = mapped_column(Float, nullable=True)
+    calories_downward_offset: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0.0")
+    calories_provenance: Mapped[str] = mapped_column(String(32), nullable=False, default="system", server_default="'system'")
+    calories_pending_reduction_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    calories_pending_reduction_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     daily_score: Mapped[float] = mapped_column(Float, nullable=False)
     score_version: Mapped[str] = mapped_column(String(16), nullable=False)
     source: Mapped[str] = mapped_column(String(32), nullable=False)

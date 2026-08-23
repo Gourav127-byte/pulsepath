@@ -11,6 +11,7 @@ class MetricCard extends StatelessWidget {
     required this.icon,
     required this.accent,
     this.unit,
+    this.provenance,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class MetricCard extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final String? unit;
+  final String? provenance;
 
   @override
   Widget build(BuildContext context) {
@@ -46,13 +48,35 @@ class MetricCard extends StatelessWidget {
                 child: Icon(icon, size: 18, color: accent),
               ),
               const SizedBox(width: 9),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: PulsePathColors.textSecondary,
-                  ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: PulsePathColors.textSecondary),
+                      ),
+                    ),
+                    if (provenance == 'health_connect' ||
+                        provenance == 'manual' ||
+                        provenance == 'blended') ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: provenance == 'health_connect'
+                              ? Colors.teal
+                              : (provenance == 'manual'
+                                    ? PulsePathColors.cyan
+                                    : PulsePathColors.violet),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],

@@ -21,6 +21,7 @@ class HealthSyncRepository {
       steps: data.steps,
       calories: data.calories,
       distance: data.distance,
+      activeMinutes: data.activeMinutes,
       source: 'health_connect',
     );
     return HealthSyncOutcome.updated;

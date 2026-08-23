@@ -16,6 +16,9 @@ class ActivityUpdate(BaseModel):
     calories: ActivityMetric | None = None
     distance: ActivityMetric | None = None
     source: str = "manual"
+    reset_steps_to_auto: bool | None = None
+    reset_distance_to_auto: bool | None = None
+    reset_calories_to_auto: bool | None = None
 
     @field_validator("steps", "active_minutes", "calories", "distance")
     @classmethod
@@ -45,6 +48,10 @@ class ActivityResponse(BaseModel):
     score_version: str
     source: str
     recording_status: str
+    steps_provenance: str = "system"
+    distance_provenance: str = "system"
+    calories_provenance: str = "system"
+    active_minutes_provenance: str = "system"
 
 
 class ActivityHistoryResponse(ActivityResponse):

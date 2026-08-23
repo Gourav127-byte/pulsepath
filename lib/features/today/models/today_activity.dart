@@ -9,6 +9,10 @@ class TodayActivity {
     required this.scoreVersion,
     required this.source,
     this.recordingStatus = ActivityRecordingStatus.legacyUnknown,
+    this.stepsProvenance = 'system',
+    this.distanceProvenance = 'system',
+    this.caloriesProvenance = 'system',
+    this.activeMinutesProvenance = 'system',
   });
 
   factory TodayActivity.fromJson(Map<String, dynamic> json) {
@@ -24,6 +28,11 @@ class TodayActivity {
       recordingStatus: ActivityRecordingStatus.fromJson(
         json['recording_status'] as String? ?? 'legacy_unknown',
       ),
+      stepsProvenance: json['steps_provenance'] as String? ?? 'system',
+      distanceProvenance: json['distance_provenance'] as String? ?? 'system',
+      caloriesProvenance: json['calories_provenance'] as String? ?? 'system',
+      activeMinutesProvenance:
+          json['active_minutes_provenance'] as String? ?? 'system',
     );
   }
 
@@ -36,6 +45,10 @@ class TodayActivity {
   final String scoreVersion;
   final String source;
   final ActivityRecordingStatus recordingStatus;
+  final String stepsProvenance;
+  final String distanceProvenance;
+  final String caloriesProvenance;
+  final String activeMinutesProvenance;
 
   bool get isRecorded => recordingStatus != ActivityRecordingStatus.unrecorded;
 }

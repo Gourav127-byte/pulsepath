@@ -347,31 +347,116 @@ def update_today_activity(
                 score_version=SCORE_VERSION,
                 source="system",
                 recording_status="unrecorded",
+                steps_downward_offset=0.0,
+                distance_downward_offset=0.0,
+                calories_downward_offset=0.0,
+                steps_provenance="system",
+                distance_provenance="system",
+                calories_provenance="system",
             )
             db.add(activity)
         update_data = update.model_dump(exclude_unset=True)
         source = update_data.pop("source", "manual")
-        
-        # Apply the update to the specific source columns
-        has_metric_updates = bool(update_data)
-        for field, value in update_data.items():
-            setattr(activity, f"{field}_{source}", value)
-            
-        # Recompute the main columns as max of manual and health_connect,
-        # falling back to legacy values if both source columns are still None
-        def compute_metric(manual: float | None, hc: float | None, legacy: float) -> float:
-            if manual is None and hc is None:
-                return legacy
-            return max(manual or 0, hc or 0)
+        reset_steps_to_auto = update_data.pop("reset_steps_to_auto", False)
+        reset_distance_to_auto = update_data.pop("reset_distance_to_auto", False)
+        reset_calories_to_auto = update_data.pop("reset_calories_to_auto", False)
 
-        activity.steps = compute_metric(activity.steps_manual, activity.steps_health_connect, activity.steps)
-        activity.active_minutes = compute_metric(activity.active_minutes_manual, activity.active_minutes_health_connect, activity.active_minutes)
-        activity.calories = compute_metric(activity.calories_manual, activity.calories_health_connect, activity.calories)
-        activity.distance = compute_metric(activity.distance_manual, activity.distance_health_connect, activity.distance)
+        has_metric_updates = bool(update_data) or reset_steps_to_auto or reset_distance_to_auto or reset_calories_to_auto
+
+        def handle_reset(metric: str):
+            setattr(activity, f"{metric}_manual", None)
+            setattr(activity, f"{metric}_downward_offset", 0.0)
+
+        if reset_steps_to_auto: handle_reset("steps")
+        if reset_distance_to_auto: handle_reset("distance")
+        if reset_calories_to_auto: handle_reset("calories")
+
+        from datetime import datetime, timezone
+        
+        for field, value in update_data.items():
+            if source == "manual":
+                if field == "active_minutes":
+                    activity.active_minutes_manual = value
+                    continue
+                # manual edit clears pending reductions
+                setattr(activity, f"{field}_pending_reduction_value", None)
+                setattr(activity, f"{field}_pending_reduction_at", None)
+
+                hc_val = getattr(activity, f"{field}_health_connect") or 0.0
+                offset = max(value, hc_val) - value
+                setattr(activity, f"{field}_manual", value)
+                setattr(activity, f"{field}_downward_offset", offset)
+            
+            elif source == "health_connect":
+                if field == "active_minutes":
+                    activity.active_minutes_health_connect = value
+                    continue
+
+                hc_val = getattr(activity, f"{field}_health_connect")
+                pending_val = getattr(activity, f"{field}_pending_reduction_value")
+
+                p = value
+                if p is None:
+                    continue
+
+                c = hc_val
+
+                def apply_hc(p_val):
+                    setattr(activity, f"{field}_health_connect", p_val)
+                    setattr(activity, f"{field}_pending_reduction_value", None)
+                    setattr(activity, f"{field}_pending_reduction_at", None)
+
+                if (p is None and c is None) or (p is not None and c is not None and p >= c) or (p is not None and c is None):
+                    apply_hc(p)
+                else:
+                    if pending_val is None:
+                        setattr(activity, f"{field}_pending_reduction_value", p)
+                        setattr(activity, f"{field}_pending_reduction_at", datetime.now(timezone.utc))
+                    else:
+                        if p == pending_val:
+                            apply_hc(p)
+                        else:
+                            setattr(activity, f"{field}_pending_reduction_value", p)
+                            setattr(activity, f"{field}_pending_reduction_at", datetime.now(timezone.utc))
+
+        def compute_effective(metric: str) -> float:
+            manual = getattr(activity, f"{metric}_manual")
+            hc = getattr(activity, f"{metric}_health_connect")
+            if metric == "active_minutes":
+                if manual is None and hc is None:
+                    return activity.active_minutes
+                return max(manual or 0, hc or 0)
+
+            offset = getattr(activity, f"{metric}_downward_offset") or 0.0
+            if manual is None and hc is None:
+                return getattr(activity, metric) or 0.0
+            current_max = max(manual or 0, hc or 0)
+            return max(manual or 0, current_max - offset)
+
+        def compute_provenance(metric: str) -> str:
+            if metric == "active_minutes":
+                return "manual" if getattr(activity, "active_minutes_manual") is not None else "system"
+
+            offset = getattr(activity, f"{metric}_downward_offset") or 0.0
+            manual = getattr(activity, f"{metric}_manual")
+            hc = getattr(activity, f"{metric}_health_connect")
+
+            if offset > 0: return 'blended'
+            if hc is not None and hc > (manual or 0): return 'health_connect'
+            if manual is not None: return 'manual'
+            return 'system'
+
+        activity.steps = compute_effective("steps")
+        activity.active_minutes = compute_effective("active_minutes")
+        activity.calories = compute_effective("calories")
+        activity.distance = compute_effective("distance")
+
+        activity.steps_provenance = compute_provenance("steps")
+        activity.calories_provenance = compute_provenance("calories")
+        activity.distance_provenance = compute_provenance("distance")
         
         # Only transition to "recorded" and update source if actual metrics
-        # were supplied.  An empty recompute-only PATCH preserves the
-        # existing recording_status and source attribution.
+        # were supplied.
         if has_metric_updates:
             activity.recording_status = "recorded"
             activity.source = source

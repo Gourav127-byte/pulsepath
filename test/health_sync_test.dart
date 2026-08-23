@@ -39,6 +39,9 @@ class MockActivityRepository implements TodayActivityRepository {
     double? calories,
     double? distance,
     String source = 'manual',
+    bool resetStepsToAuto = false,
+    bool resetDistanceToAuto = false,
+    bool resetCaloriesToAuto = false,
   }) async {
     if (isUnauthorized) {
       throw const NetworkException('Unauthorized', statusCode: 401);

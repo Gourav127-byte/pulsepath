@@ -43,6 +43,9 @@ class TodayActivityRepository {
     double? calories,
     double? distance,
     String source = 'manual',
+    bool resetStepsToAuto = false,
+    bool resetDistanceToAuto = false,
+    bool resetCaloriesToAuto = false,
   }) async {
     final body = <String, Object?>{'source': source};
     if (steps != null) {
@@ -57,6 +60,11 @@ class TodayActivityRepository {
     if (distance != null) {
       body['distance'] = distance;
     }
+
+    if (resetStepsToAuto) body['reset_steps_to_auto'] = true;
+    if (resetDistanceToAuto) body['reset_distance_to_auto'] = true;
+    if (resetCaloriesToAuto) body['reset_calories_to_auto'] = true;
+
     final response = await _apiClient.patchJson('/activity/today', body);
     return TodayActivity.fromJson(response);
   }

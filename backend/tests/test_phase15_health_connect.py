@@ -198,12 +198,13 @@ class TestManualAfterHealthConnect:
         assert r.json()["steps"] == 9000
         assert r.json()["source"] == "manual"
 
-    def test_manual_lower_than_hc_keeps_hc(self, mock_user_token: str) -> None:
-        """User manually enters fewer steps than HC — max() keeps HC value."""
+    def test_manual_lower_than_hc_reconciles_downward(self, mock_user_token: str) -> None:
+        """User manually enters fewer steps than HC — downward offset reconciles to manual value with blended provenance."""
         request("PATCH", "/activity/today", {"steps": 8000, "source": "health_connect"}, token=mock_user_token)
         r = request("PATCH", "/activity/today", {"steps": 2000, "source": "manual"}, token=mock_user_token)
         assert r.status_code == 200
-        assert r.json()["steps"] == 8000  # HC still wins via max()
+        assert r.json()["steps"] == 2000.0  # Downward offset reconciles to 2000
+        assert r.json()["steps_provenance"] == "blended"
         # Source reflects the last source that provided metrics
         assert r.json()["source"] == "manual"
 
@@ -494,11 +495,13 @@ class TestCrossUserIsolation:
 
 class TestEdgeCases:
 
-    def test_zero_manual_does_not_erase_hc(self, mock_user_token: str) -> None:
-        """User manually enters 0 steps; HC value of 5000 should still win."""
+    def test_zero_manual_reconciles_downward(self, mock_user_token: str) -> None:
+        """User manually enters 0 steps; downward offset reconciles value to 0 with blended provenance."""
         request("PATCH", "/activity/today", {"steps": 5000, "source": "health_connect"}, token=mock_user_token)
         r = request("PATCH", "/activity/today", {"steps": 0, "source": "manual"}, token=mock_user_token)
-        assert r.json()["steps"] == 5000  # max(0, 5000)
+        assert r.status_code == 200
+        assert r.json()["steps"] == 0.0  # Downward offset reconciles to 0
+        assert r.json()["steps_provenance"] == "blended"
 
     def test_zero_hc_does_not_erase_manual(self, mock_user_token: str) -> None:
         """HC reports 0 steps; manual value of 5000 should still win."""

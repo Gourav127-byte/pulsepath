@@ -29,17 +29,20 @@ def test_today_activity_returns_seeded_values_and_score(mock_user_token: str) ->
     response = request("/activity/today", token=mock_user_token)
 
     assert response.status_code == 200
-    assert response.json() == {
-        "date": date.today().isoformat(),
-        "steps": 7842.0,
-        "active_minutes": 46.0,
-        "distance": 5.6,
-        "calories": 324.0,
-        "daily_score": 77.0,
-        "score_version": "v1",
-        "source": "manual",
-        "recording_status": "recorded",
-    }
+    data = response.json()
+    assert data["date"] == date.today().isoformat()
+    assert data["steps"] == 7842.0
+    assert data["active_minutes"] == 46.0
+    assert data["distance"] == 5.6
+    assert data["calories"] == 324.0
+    assert data["daily_score"] == 77.0
+    assert data["score_version"] == "v1"
+    assert data["source"] == "manual"
+    assert data["recording_status"] == "recorded"
+    assert data["steps_provenance"] in ("system", "health_connect", "manual", "blended")
+    assert data["distance_provenance"] in ("system", "health_connect", "manual", "blended")
+    assert data["calories_provenance"] in ("system", "health_connect", "manual", "blended")
+    assert data["active_minutes_provenance"] in ("system", "health_connect", "manual", "blended")
 
 
 def test_daily_score_v1_matches_locked_calculation() -> None:
