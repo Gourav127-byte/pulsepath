@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     expose_password_reset_token: bool = False
     cors_allowed_origins: list[str] = Field(default_factory=list)
 
+    veya_provider: str = "unavailable"
+    veya_api_key: str | None = Field(default=None, repr=False)
+    veya_api_url: str | None = Field(default=None, repr=False)
+    veya_model: str = "gpt-4o-mini"
+    veya_timeout_seconds: float = 10.0
+
     @model_validator(mode="after")
     def reject_development_secret_outside_development(self) -> "Settings":
         if self.app_env != "development" and self.jwt_secret.startswith("DEV-ONLY-"):
