@@ -6,6 +6,10 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.veya import VeyaProviderRequest, VeyaStructuredResponse
+from app.services.veya_grounding import (
+    VeyaGroundingError,
+    validate_and_ground_veya_response,
+)
 
 
 class VeyaProviderUnavailableError(RuntimeError):
@@ -151,8 +155,9 @@ async def generate_veya_response(
     request: VeyaProviderRequest,
 ) -> VeyaStructuredResponse:
     try:
-        return await provider.generate(request)
-    except VeyaProviderUnavailableError:
+        raw_response = await provider.generate(request)
+        return validate_and_ground_veya_response(raw_response, request.evidence)
+    except (VeyaProviderUnavailableError, VeyaGroundingError):
         return VeyaStructuredResponse(
             status="provider_unavailable",
             summary="VEYA insights are temporarily unavailable.",

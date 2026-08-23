@@ -12,6 +12,9 @@ from app.schemas.activity import (
 RecordingStatus = Literal["recorded", "legacy_unknown"]
 MetricProvenance = Literal["system", "manual", "health_connect", "blended"]
 IntegrityLevel = Literal["solid", "partial", "sparse"]
+ObservationCategory = Literal[
+    "consistency", "trend", "goal_progress", "routine_recovery"
+]
 
 
 class VeyaActivityFact(BaseModel):
@@ -78,6 +81,7 @@ class VeyaObservation(BaseModel):
 
     text: str
     confidence: Literal["high", "medium", "low"]
+    category: ObservationCategory = "consistency"
     evidence: tuple[VeyaEvidenceCitation, ...]
 
 
