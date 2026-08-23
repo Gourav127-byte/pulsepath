@@ -22,6 +22,9 @@ import 'package:pulsepath/features/profile/providers/backend_profile_provider.da
 import 'package:pulsepath/features/auth/models/auth_user.dart';
 import 'package:pulsepath/features/auth/providers/auth_provider.dart';
 
+import 'package:pulsepath/features/veya/models/veya_foundation.dart';
+import 'package:pulsepath/features/veya/providers/veya_providers.dart';
+
 void main() {
   testWidgets('Today screen shows daily activity data', (tester) async {
     await tester.pumpWidget(
@@ -153,6 +156,30 @@ void main() {
               stepsChangePercent: null,
               averageScoreChange: null,
               strongestDay: null,
+            ),
+          ),
+          veyaFoundationProvider.overrideWith(
+            (ref, days) async => const VeyaFoundationResponse(
+              evidence: VeyaEvidencePacket(
+                schemaVersion: '1.0',
+                rangeDays: 7,
+                activities: [],
+                integrity: VeyaIntegrityLens(
+                  level: 'sparse',
+                  confirmedDays: 0,
+                  legacyDays: 0,
+                  missingDays: 7,
+                  confirmedCoverage: 0,
+                  rationale: '',
+                ),
+              ),
+              response: VeyaStructuredResponse(
+                status: 'provider_unavailable',
+                summary: 'VEYA insights unavailable.',
+                observations: [],
+                limitations: [],
+                medicalOrCausalClaims: false,
+              ),
             ),
           ),
         ],

@@ -20,6 +20,9 @@ import '../widgets/daily_score_card.dart';
 import '../widgets/daily_score_explanation_sheet.dart';
 import '../widgets/metric_card.dart';
 import '../widgets/manual_activity_edit_sheet.dart';
+import '../../veya/providers/veya_providers.dart';
+import '../../veya/widgets/veya_insights_card.dart';
+import '../../veya/widgets/veya_chat_sheet.dart';
 
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
@@ -260,6 +263,15 @@ class _ActivityContent extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         _EngagementState(engagement: engagement, onRetry: onEngagementRetry),
+        const SizedBox(height: 14),
+        ref.watch(veyaFoundationProvider(7)).when(
+              data: (veyaData) => VeyaInsightsCard(
+                response: veyaData.response,
+                onAskVeya: () => VeyaChatSheet.show(context),
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+            ),
         const SizedBox(height: 26),
         _SectionTitle(
           title: "Today's activity",

@@ -13,6 +13,9 @@ import 'package:pulsepath/features/today/models/today_activity.dart';
 import 'package:pulsepath/features/today/presentation/pulse_path_shell.dart';
 import 'package:pulsepath/features/today/providers/today_activity_provider.dart';
 
+import 'package:pulsepath/features/veya/models/veya_foundation.dart';
+import 'package:pulsepath/features/veya/providers/veya_providers.dart';
+
 void main() {
   testWidgets('resume after local date change refreshes Today exactly once', (
     tester,
@@ -113,6 +116,30 @@ Widget _app({
           bestStreak: 0,
           todayPending: true,
           achievements: [],
+        ),
+      ),
+      veyaFoundationProvider.overrideWith(
+        (ref, days) async => const VeyaFoundationResponse(
+          evidence: VeyaEvidencePacket(
+            schemaVersion: '1.0',
+            rangeDays: 7,
+            activities: [],
+            integrity: VeyaIntegrityLens(
+              level: 'sparse',
+              confirmedDays: 0,
+              legacyDays: 0,
+              missingDays: 7,
+              confirmedCoverage: 0,
+              rationale: '',
+            ),
+          ),
+          response: VeyaStructuredResponse(
+            status: 'provider_unavailable',
+            summary: 'VEYA insights unavailable.',
+            observations: [],
+            limitations: [],
+            medicalOrCausalClaims: false,
+          ),
         ),
       ),
     ],

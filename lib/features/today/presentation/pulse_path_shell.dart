@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../goals/presentation/goals_screen.dart';
 import '../../journey/presentation/journey_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../veya/presentation/veya_screen.dart';
 import 'today_screen.dart';
 import '../providers/today_activity_provider.dart';
 import '../../goals/providers/backend_goals_provider.dart';
 import '../../journey/providers/activity_history_provider.dart';
+import '../../veya/providers/veya_providers.dart';
 
 final selectedTabProvider = StateProvider<int>((ref) => 0);
 final midnightTimerFactoryProvider =
@@ -40,6 +42,11 @@ class _PulsePathShellState extends ConsumerState<PulsePathShell>
       icon: Icon(Icons.route_outlined),
       selectedIcon: Icon(Icons.route_rounded),
       label: 'Journey',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.auto_awesome_outlined),
+      selectedIcon: Icon(Icons.auto_awesome_rounded),
+      label: 'VEYA',
     ),
     NavigationDestination(
       icon: Icon(Icons.flag_outlined),
@@ -85,6 +92,7 @@ class _PulsePathShellState extends ConsumerState<PulsePathShell>
         children: const [
           TodayScreen(),
           JourneyScreen(),
+          VeyaScreen(),
           GoalsScreen(),
           ProfileScreen(),
         ],
@@ -130,6 +138,8 @@ class _PulsePathShellState extends ConsumerState<PulsePathShell>
     ref.invalidate(backendGoalsProvider);
     ref.invalidate(activityHistoryProvider(7));
     ref.invalidate(activityHistoryProvider(30));
+    ref.invalidate(veyaFoundationProvider(7));
+    ref.invalidate(veyaFoundationProvider(30));
   }
 
   DateTime _dateOnly(DateTime value) =>
