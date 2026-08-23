@@ -100,3 +100,21 @@ class VeyaFoundationResponse(BaseModel):
 
     evidence: VeyaEvidencePacket
     response: VeyaStructuredResponse
+
+
+class VeyaChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=500)
+    range_days: Literal[7, 30] = 7
+
+
+class VeyaChatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    reply: str
+    evidence: VeyaEvidencePacket
+    observations: tuple[VeyaObservation, ...] = ()
+    status: Literal["grounded", "provider_unavailable"]
+    medical_or_causal_claims: Literal[False] = False

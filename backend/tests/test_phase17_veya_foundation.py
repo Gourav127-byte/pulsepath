@@ -222,3 +222,22 @@ def test_provider_receives_only_structured_evidence_and_safety_constraints() -> 
     assert "password" not in str(serialized)
     assert any("medical" in constraint for constraint in serialized["constraints"])
     assert any("causal" in constraint for constraint in serialized["constraints"])
+
+
+async def _post(path: str, body: dict, token: str | None = None):
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.post(path, json=body, headers=headers)
+
+
+def test_veya_chat_endpoint_returns_grounded_response() -> None:
+    _user_id, token = _create_user_with_activity(steps=5000)
+    response = asyncio.run(_post("/veya/chat", {"message": "How is my progress?"}, token))
+    assert response.status_code == 200
+    data = response.json()
+    assert data["query"] == "How is my progress?"
+    assert data["status"] in ("grounded", "provider_unavailable")
+    assert "evidence" in data
