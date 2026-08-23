@@ -22,7 +22,7 @@ import pytest
 import asyncio
 from datetime import date
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from app.db.models.activity import Activity
 from app.core.config import settings
 from app.main import app
@@ -38,6 +38,25 @@ async def get(path: str, token: str) -> dict:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.get(path, headers={"Authorization": f"Bearer {token}"})
         return r
+
+
+def activity_for_token(token: str) -> Activity:
+    payload = jwt.decode(
+        token,
+        settings.jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+    )
+    user_id = uuid.UUID(payload["sub"])
+    with SessionLocal() as db:
+        activity = db.scalar(
+            select(Activity).where(
+                Activity.user_id == user_id,
+                Activity.date == date.today(),
+            )
+        )
+        assert activity is not None
+        db.expunge(activity)
+        return activity
 
 @pytest.mark.anyio
 async def test_reconciliation_downward_correction_and_growth(temp_user_token):
@@ -125,6 +144,71 @@ async def test_reset_to_auto(temp_user_token):
     assert r.status_code == 200
     assert r.json()["steps"] == 20000
     assert r.json()["steps_provenance"] == "health_connect"
+
+
+@pytest.mark.anyio
+async def test_manual_active_minutes_never_writes_health_connect_field(
+    temp_user_token,
+):
+    r = await patch(
+        "/activity/today",
+        json={"source": "manual", "active_minutes": 42},
+        token=temp_user_token,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["active_minutes"] == 42
+    assert r.json()["active_minutes_provenance"] == "manual"
+    activity = activity_for_token(temp_user_token)
+    assert activity.active_minutes_manual == 42
+    assert activity.active_minutes_health_connect is None
+
+
+@pytest.mark.anyio
+async def test_reset_to_auto_clears_pending_reduction_state(temp_user_token):
+    await patch(
+        "/activity/today",
+        json={"source": "health_connect", "steps": 20000},
+        token=temp_user_token,
+    )
+    await patch(
+        "/activity/today",
+        json={"source": "health_connect", "steps": 15000},
+        token=temp_user_token,
+    )
+    pending = activity_for_token(temp_user_token)
+    assert pending.steps_pending_reduction_value == 15000
+    assert pending.steps_pending_reduction_at is not None
+
+    r = await patch(
+        "/activity/today",
+        json={"reset_steps_to_auto": True},
+        token=temp_user_token,
+    )
+
+    assert r.status_code == 200
+    reset = activity_for_token(temp_user_token)
+    assert reset.steps_pending_reduction_value is None
+    assert reset.steps_pending_reduction_at is None
+
+
+@pytest.mark.anyio
+async def test_reset_flag_does_not_record_untouched_fresh_activity(temp_user_token):
+    initial = await get("/activity/today", token=temp_user_token)
+    assert initial.status_code == 200
+    assert initial.json()["recording_status"] == "unrecorded"
+    assert initial.json()["source"] == "system"
+
+    r = await patch(
+        "/activity/today",
+        json={"reset_steps_to_auto": True},
+        token=temp_user_token,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["recording_status"] == "unrecorded"
+    assert r.json()["source"] == "system"
+    assert r.json()["steps_provenance"] == "system"
 
 @pytest.mark.anyio
 async def test_fresh_day_and_mixed_metrics(temp_user_token):

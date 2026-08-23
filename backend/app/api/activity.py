@@ -361,15 +361,30 @@ def update_today_activity(
         reset_distance_to_auto = update_data.pop("reset_distance_to_auto", False)
         reset_calories_to_auto = update_data.pop("reset_calories_to_auto", False)
 
-        has_metric_updates = bool(update_data) or reset_steps_to_auto or reset_distance_to_auto or reset_calories_to_auto
-
-        def handle_reset(metric: str):
+        def handle_reset(metric: str) -> bool:
+            changed = any(
+                (
+                    getattr(activity, f"{metric}_manual") is not None,
+                    bool(getattr(activity, f"{metric}_downward_offset")),
+                    getattr(activity, f"{metric}_pending_reduction_value") is not None,
+                    getattr(activity, f"{metric}_pending_reduction_at") is not None,
+                )
+            )
             setattr(activity, f"{metric}_manual", None)
             setattr(activity, f"{metric}_downward_offset", 0.0)
+            setattr(activity, f"{metric}_pending_reduction_value", None)
+            setattr(activity, f"{metric}_pending_reduction_at", None)
+            return changed
 
-        if reset_steps_to_auto: handle_reset("steps")
-        if reset_distance_to_auto: handle_reset("distance")
-        if reset_calories_to_auto: handle_reset("calories")
+        reset_changed = False
+        if reset_steps_to_auto:
+            reset_changed = handle_reset("steps") or reset_changed
+        if reset_distance_to_auto:
+            reset_changed = handle_reset("distance") or reset_changed
+        if reset_calories_to_auto:
+            reset_changed = handle_reset("calories") or reset_changed
+
+        has_metric_updates = bool(update_data) or reset_changed
 
         from datetime import datetime, timezone
         
