@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system dependencies needed for PostgreSQL build & curl health checks
+# Install system dependencies needed for PostgreSQL & curl health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq-dev \
@@ -25,10 +25,10 @@ COPY app /app/app
 COPY migrations /app/migrations
 COPY alembic.ini /app/
 COPY gunicorn.conf.py /app/
-COPY scripts/start.sh /app/scripts/
+COPY scripts /app/scripts/
 
-# Set executable permissions on entrypoint script
-RUN chmod +x /app/scripts/start.sh
+# Set executable permissions on entrypoint scripts
+RUN chmod +x /app/scripts/*.sh
 
 # Create non-root system user for security
 RUN useradd -m pulsepath && chown -R pulsepath:pulsepath /app
