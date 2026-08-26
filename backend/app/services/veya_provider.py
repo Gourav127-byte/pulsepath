@@ -1,6 +1,7 @@
 import json
 import time
 from typing import Protocol
+from uuid import UUID
 
 import httpx
 from pydantic import ValidationError
