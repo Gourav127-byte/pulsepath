@@ -6,9 +6,8 @@ import multiprocessing
 bind = "0.0.0.0:8000"
 backlog = 2048
 
-# Worker processes
-# Formula: (2 x $num_cores) + 1
-default_workers = (multiprocessing.cpu_count() * 2) + 1
+# Worker processes (Optimized for low-memory 512MB RAM containers)
+default_workers = int(os.getenv("WEB_CONCURRENCY", "2"))
 workers = int(os.getenv("GUNICORN_WORKERS", default_workers))
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
