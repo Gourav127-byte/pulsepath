@@ -62,7 +62,8 @@ os.environ["DATABASE_URL"] = _test_url.render_as_string(hide_password=False)
 os.environ.setdefault("JWT_SECRET", "TEST-ONLY-pulsepath-pytest-secret")
 
 from app.core.constants import MOCK_USER_ID
-from app.db.database import SessionLocal
+from app.db.base import Base
+from app.db.database import SessionLocal, engine
 from app.db.seed import seed_data
 from app.services.auth import create_access_token
 
@@ -71,7 +72,7 @@ def _truncate_test_database() -> None:
     with SessionLocal() as session:
         session.execute(
             text(
-                "TRUNCATE TABLE password_reset_tokens, activities, goals, "
+                "TRUNCATE TABLE email_otps, phone_otps, password_reset_tokens, refresh_tokens, activities, goals, "
                 "profiles, users RESTART IDENTITY CASCADE"
             )
         )

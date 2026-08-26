@@ -11,11 +11,7 @@ def determine_trend(
     previous_recorded_days: int,
     average_score_change: float | None,
 ) -> str:
-    """Return a deterministic trend label from confirmed recorded data only.
-
-    Uses the average daily score change between the current and previous
-    period.  A ±5-point dead zone prevents flip-flopping on small changes.
-    """
+    """Return a deterministic trend label from confirmed recorded data only."""
     if (
         current_recorded_days == 0
         or previous_recorded_days == 0
@@ -30,9 +26,10 @@ def determine_trend(
 
 
 def _average(records: Sequence[Activity], field: str) -> float | None:
-    if not records:
+    vals = [float(getattr(record, field)) for record in records if getattr(record, field) is not None]
+    if not vals:
         return None
-    return float(fmean(float(getattr(record, field)) for record in records))
+    return float(fmean(vals))
 
 
 def _percent_change(current: float | None, previous: float | None) -> float | None:
@@ -58,12 +55,12 @@ def build_activity_insights(
         else None
     )
     strongest_steps = (
-        max(current, key=lambda item: (item.steps, item.daily_score, item.date))
+        max(current, key=lambda item: (item.steps or 0.0, item.daily_score or 0.0, item.date))
         if current
         else None
     )
     strongest_score = (
-        max(current, key=lambda item: (item.daily_score, item.steps, item.date))
+        max(current, key=lambda item: (item.daily_score or 0.0, item.steps or 0.0, item.date))
         if current
         else None
     )
@@ -73,19 +70,19 @@ def build_activity_insights(
         "previous_recorded_days": len(previous),
         "current_legacy_days": current_legacy_days,
         "previous_legacy_days": previous_legacy_days,
-        "total_steps": sum(float(item.steps) for item in current),
+        "total_steps": sum(float(item.steps or 0.0) for item in current),
         "average_steps": current_steps,
-        "total_distance": sum(float(item.distance) for item in current),
-        "total_active_calories": sum(float(item.calories) for item in current),
+        "total_distance": sum(float(item.distance or 0.0) for item in current),
+        "total_active_calories": sum(float(item.calories or 0.0) for item in current),
         "average_score": current_score,
         "steps_change_percent": _percent_change(current_steps, previous_steps),
         "distance_change_percent": _percent_change(
-            sum(float(item.distance) for item in current) if current else None,
-            sum(float(item.distance) for item in previous) if previous else None,
+            sum(float(item.distance) for item in current if item.distance is not None) if current else None,
+            sum(float(item.distance) for item in previous if item.distance is not None) if previous else None,
         ),
         "active_calories_change_percent": _percent_change(
-            sum(float(item.calories) for item in current) if current else None,
-            sum(float(item.calories) for item in previous) if previous else None,
+            sum(float(item.calories) for item in current if item.calories is not None) if current else None,
+            sum(float(item.calories) for item in previous if item.calories is not None) if previous else None,
         ),
         "average_score_change": average_score_change,
         "trend": trend,

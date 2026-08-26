@@ -4,10 +4,7 @@ import '../models/veya_foundation.dart';
 class VeyaSuggestionsCard extends StatelessWidget {
   final List<VeyaObservation> observations;
 
-  const VeyaSuggestionsCard({
-    super.key,
-    required this.observations,
-  });
+  const VeyaSuggestionsCard({super.key, required this.observations});
 
   @override
   Widget build(BuildContext context) {
@@ -31,16 +28,23 @@ class VeyaSuggestionsCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.auto_awesome_rounded,
-                  color: Color(0xFFE100FF), size: 20),
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: Color(0xFFE100FF),
+                size: 20,
+              ),
               SizedBox(width: 8),
-              Text(
-                'SMART SUGGESTIONS & HIGHLIGHTS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+              Expanded(
+                child: Text(
+                  'SMART SUGGESTIONS & HIGHLIGHTS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

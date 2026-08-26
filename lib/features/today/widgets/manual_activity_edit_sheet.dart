@@ -212,7 +212,8 @@ class _ManualActivityEditSheetState extends State<ManualActivityEditSheet> {
     }
   }
 
-  static String _displayValue(double value) {
+  static String _displayValue(double? value) {
+    if (value == null) return '';
     return value == value.roundToDouble()
         ? value.toStringAsFixed(0)
         : value.toString();

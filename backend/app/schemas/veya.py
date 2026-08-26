@@ -21,11 +21,11 @@ class VeyaActivityFact(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     date: Date
-    steps: float
-    active_minutes: float
-    distance: float
-    active_calories: float
-    daily_score: float
+    steps: float | None = None
+    active_minutes: float | None = None
+    distance: float | None = None
+    active_calories: float | None = None
+    daily_score: float | None = None
     score_version: str
     source: str
     recording_status: RecordingStatus

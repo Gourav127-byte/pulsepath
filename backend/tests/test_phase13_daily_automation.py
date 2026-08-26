@@ -58,7 +58,7 @@ def test_lazy_today_is_unrecorded_and_absent_from_history() -> None:
     history = asyncio.run(_request("GET", "/activity/history?days=7", token)).json()
 
     assert today["recording_status"] == "unrecorded"
-    assert today["steps"] == 0
+    assert today["steps"] is None
     assert history == []
     with SessionLocal() as session:
         stored = session.scalar(select(Activity).where(Activity.user_id == user.id))
@@ -114,7 +114,7 @@ def test_first_write_creates_today_without_mutating_yesterday() -> None:
 
     assert response.status_code == 200
     assert response.json()["steps"] == 12500
-    assert response.json()["daily_score"] == 50
+    assert response.json()["daily_score"] == 100
     assert response.json()["recording_status"] == "recorded"
     with SessionLocal() as session:
         records = session.scalars(

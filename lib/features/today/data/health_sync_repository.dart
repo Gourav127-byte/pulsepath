@@ -15,7 +15,22 @@ class HealthSyncRepository {
     }
 
     final data = await _healthService.fetchDailyData();
+    print(
+      '[VALIDATION_GATE][CHECKPOINT_4] HealthSyncRepository sync fetched: '
+      'steps=${data.steps}, distance=${data.distance}, calories=${data.calories}, timelineSamples=${data.timelineSamples.length}',
+    );
     if (data.isEmpty) return HealthSyncOutcome.noData;
+
+    if (data.timelineSamples.isNotEmpty) {
+      try {
+        await _activityRepository.syncTimelineSamples(
+          date: DateTime.now(),
+          samples: data.timelineSamples,
+        );
+      } catch (e) {
+        print('[TIMELINE_ERROR] syncTimelineSamples failed: $e');
+      }
+    }
 
     await _activityRepository.updateTodayActivity(
       steps: data.steps,

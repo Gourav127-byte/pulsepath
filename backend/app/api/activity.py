@@ -10,6 +10,7 @@ from app.api.dependencies import get_current_user
 from app.db.database import get_db
 from app.db.models.activity import Activity
 from app.db.models.goal import Goal
+from app.db.models.step_sample import StepSample
 from app.db.models.user import User
 from app.schemas.activity import (
     ActivityAchievementResponse,
@@ -18,8 +19,11 @@ from app.schemas.activity import (
     ActivityInsightsResponse,
     ActivityResponse,
     ActivityStreakResponse,
+    ActivityTimelineResponse,
+    ActivityTimelineSyncRequest,
     ActivityUpdate,
     DailyScoreExplanationResponse,
+    StepSampleDTO,
 )
 from app.services.activity_insights import build_activity_insights
 from app.services.activity_streak import (
@@ -299,11 +303,11 @@ def get_today_activity(
         activity = Activity(
             user_id=user.id,
             date=today,
-            steps=0,
-            active_minutes=0,
-            calories=0,
-            distance=0,
-            daily_score=0,
+            steps=None,
+            active_minutes=None,
+            calories=None,
+            distance=None,
+            daily_score=None,
             score_version=SCORE_VERSION,
             source="system",
             recording_status="unrecorded",
@@ -339,11 +343,11 @@ def update_today_activity(
             activity = Activity(
                 user_id=user.id,
                 date=date.today(),
-                steps=0,
-                active_minutes=0,
-                calories=0,
-                distance=0,
-                daily_score=0,
+                steps=None,
+                active_minutes=None,
+                calories=None,
+                distance=None,
+                daily_score=None,
                 score_version=SCORE_VERSION,
                 source="system",
                 recording_status="unrecorded",
@@ -434,19 +438,18 @@ def update_today_activity(
                             setattr(activity, f"{field}_pending_reduction_value", p)
                             setattr(activity, f"{field}_pending_reduction_at", datetime.now(timezone.utc))
 
-        def compute_effective(metric: str) -> float:
+        def compute_effective(metric: str) -> float | None:
             manual = getattr(activity, f"{metric}_manual")
             hc = getattr(activity, f"{metric}_health_connect")
+            existing = getattr(activity, metric)
+            if manual is None and hc is None:
+                return existing
             if metric == "active_minutes":
-                if manual is None and hc is None:
-                    return activity.active_minutes
-                return max(manual or 0, hc or 0)
+                return max(manual if manual is not None else 0.0, hc if hc is not None else 0.0)
 
             offset = getattr(activity, f"{metric}_downward_offset") or 0.0
-            if manual is None and hc is None:
-                return getattr(activity, metric) or 0.0
-            current_max = max(manual or 0, hc or 0)
-            return max(manual or 0, current_max - offset)
+            current_max = max(manual if manual is not None else 0.0, hc if hc is not None else 0.0)
+            return max(manual if manual is not None else 0.0, current_max - offset)
 
         def compute_provenance(metric: str) -> str:
             if metric == "active_minutes":
@@ -493,6 +496,12 @@ def update_today_activity(
 
         db.commit()
         db.refresh(activity)
+        print(
+            f"[VALIDATION_GATE][CHECKPOINT_6&7] Backend update complete: "
+            f"steps={activity.steps}, steps_hc={activity.steps_health_connect}, "
+            f"steps_manual={activity.steps_manual}, provenance={activity.steps_provenance}, "
+            f"score={activity.daily_score}, recording_status={activity.recording_status}"
+        )
     except SQLAlchemyError as error:
         db.rollback()
         raise HTTPException(
@@ -507,3 +516,127 @@ def update_today_activity(
         ) from error
 
     return activity
+
+
+@router.post("/timeline/sync", response_model=ActivityTimelineResponse)
+def sync_activity_timeline(
+    payload: ActivityTimelineSyncRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Idempotently sync intraday step samples for a specific date."""
+    try:
+        existing_samples = list(
+            db.scalars(
+                select(StepSample).where(
+                    StepSample.user_id == user.id,
+                    StepSample.date == payload.date,
+                )
+            ).all()
+        )
+        existing_ids = {s.sample_id: s for s in existing_samples if s.sample_id}
+
+        for sample_dto in payload.samples:
+            if sample_dto.sample_id and sample_dto.sample_id in existing_ids:
+                # Update existing sample
+                existing_sample = existing_ids[sample_dto.sample_id]
+                existing_sample.start_time = sample_dto.start_time
+                existing_sample.end_time = sample_dto.end_time
+                existing_sample.steps = sample_dto.steps
+                existing_sample.source_origin = sample_dto.source_origin
+            else:
+                # Insert new sample
+                new_sample = StepSample(
+                    user_id=user.id,
+                    date=payload.date,
+                    start_time=sample_dto.start_time,
+                    end_time=sample_dto.end_time,
+                    steps=sample_dto.steps,
+                    source_origin=sample_dto.source_origin,
+                    sample_id=sample_dto.sample_id,
+                )
+                db.add(new_sample)
+
+        db.commit()
+
+        # Query updated timeline
+        all_samples = list(
+            db.scalars(
+                select(StepSample)
+                .where(
+                    StepSample.user_id == user.id,
+                    StepSample.date == payload.date,
+                )
+                .order_by(StepSample.start_time.asc())
+            ).all()
+        )
+
+        total_steps = sum(s.steps for s in all_samples)
+        timeline_dtos = [
+            StepSampleDTO(
+                sample_id=s.sample_id,
+                start_time=s.start_time,
+                end_time=s.end_time,
+                steps=s.steps,
+                source_origin=s.source_origin,
+            )
+            for s in all_samples
+        ]
+
+        return {
+            "date": payload.date,
+            "total_steps": total_steps,
+            "samples_count": len(all_samples),
+            "timeline": timeline_dtos,
+        }
+    except SQLAlchemyError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not sync activity timeline",
+        ) from error
+
+
+@router.get("/timeline", response_model=ActivityTimelineResponse)
+def get_activity_timeline(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    target_date: Annotated[date | None, Query(alias="date")] = None,
+) -> dict[str, object]:
+    """Retrieve intraday step samples for a specific date (defaults to today)."""
+    date_val = target_date or date.today()
+    try:
+        samples = list(
+            db.scalars(
+                select(StepSample)
+                .where(
+                    StepSample.user_id == user.id,
+                    StepSample.date == date_val,
+                )
+                .order_by(StepSample.start_time.asc())
+            ).all()
+        )
+
+        total_steps = sum(s.steps for s in samples)
+        timeline_dtos = [
+            StepSampleDTO(
+                sample_id=s.sample_id,
+                start_time=s.start_time,
+                end_time=s.end_time,
+                steps=s.steps,
+                source_origin=s.source_origin,
+            )
+            for s in samples
+        ]
+
+        return {
+            "date": date_val,
+            "total_steps": total_steps,
+            "samples_count": len(samples),
+            "timeline": timeline_dtos,
+        }
+    except SQLAlchemyError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not fetch activity timeline",
+        ) from error

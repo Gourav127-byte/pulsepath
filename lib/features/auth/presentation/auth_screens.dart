@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/pulse_path_theme.dart';
 import '../data/auth_repository.dart';
 import '../providers/auth_provider.dart';
+import 'phone_auth_sheet.dart';
 
 enum _AuthPage { login, signUp, forgot, reset }
 
@@ -117,6 +118,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onPressed: loading ? null : _submit,
               child: loading ? const _ButtonProgress() : const Text('Login'),
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'OR',
+                    style: TextStyle(
+                      color: PulsePathColors.textSecondary.withValues(alpha: 0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: const Key('google_signin_button'),
+              onPressed: loading ? null : _googleSignIn,
+              icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+              label: const Text('Sign in with Google'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('phone_auth_button'),
+              onPressed: loading ? null : _openPhoneAuth,
+              icon: const Icon(Icons.phone_android_rounded, size: 20),
+              label: const Text('Sign in with Phone Number'),
+            ),
             const SizedBox(height: 16),
             _AuthLink(
               prompt: 'New to PulsePath?',
@@ -126,6 +159,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _googleSignIn() async {
+    try {
+      final session = await ref.read(authRepositoryProvider).signInWithGoogleNative();
+      ref.read(authControllerProvider.notifier).setSession(session);
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Google Sign-In cancelled or failed.')),
+        );
+      }
+    }
+  }
+
+  void _openPhoneAuth() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: PulsePathColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const PhoneAuthSheet(),
     );
   }
 }

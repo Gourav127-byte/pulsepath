@@ -12,6 +12,7 @@ class VeyaChatSheet extends ConsumerStatefulWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: const Color(0xFF120B2E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -62,120 +63,136 @@ class _VeyaChatSheetState extends ConsumerState<VeyaChatSheet> {
     final messages = ref.watch(veyaChatProvider);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                VeyaBadge(size: 32),
-                SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        top: false,
+        child: FractionallySizedBox(
+          heightFactor: 0.86,
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   children: [
-                    Text(
-                      'VEYA AI ASSISTANT',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
+                    VeyaBadge(size: 32),
+                    SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'VEYA AI ASSISTANT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        Text(
+                          'Evidence-Grounded Intelligence',
+                          style: TextStyle(
+                            color: Color(0xFF00F2FE),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10, height: 1),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    return _buildMessageBubble(messages[index]);
+                  },
+                ),
+              ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                child: Row(
+                  children: _quickPrompts.map((prompt) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        backgroundColor: const Color(0xFF1F1A3A),
+                        side: const BorderSide(
+                          color: Color(0xFF00F2FE),
+                          width: 0.8,
+                        ),
+                        label: Text(
+                          prompt,
+                          style: const TextStyle(
+                            color: Color(0xFF00F2FE),
+                            fontSize: 11,
+                          ),
+                        ),
+                        onPressed: () => _send(prompt),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Ask VEYA about your activity data...',
+                          hintStyle: const TextStyle(color: Colors.white38),
+                          filled: true,
+                          fillColor: const Color(0xFF1E173E),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onSubmitted: _send,
                       ),
                     ),
-                    Text(
-                      'Evidence-Grounded Intelligence',
-                      style: TextStyle(
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => _send(_controller.text),
+                      icon: const Icon(
+                        Icons.send_rounded,
                         color: Color(0xFF00F2FE),
-                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          const Divider(color: Colors.white10, height: 1),
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                return _buildMessageBubble(messages[index]);
-              },
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: _quickPrompts.map((prompt) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ActionChip(
-                    backgroundColor: const Color(0xFF1F1A3A),
-                    side: const BorderSide(color: Color(0xFF00F2FE), width: 0.8),
-                    label: Text(
-                      prompt,
-                      style: const TextStyle(
-                        color: Color(0xFF00F2FE),
-                        fontSize: 11,
-                      ),
-                    ),
-                    onPressed: () => _send(prompt),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Ask VEYA about your activity data...',
-                      hintStyle: const TextStyle(color: Colors.white38),
-                      filled: true,
-                      fillColor: const Color(0xFF1E173E),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onSubmitted: _send,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _send(_controller.text),
-                  icon: const Icon(Icons.send_rounded, color: Color(0xFF00F2FE)),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -199,7 +216,9 @@ class _VeyaChatSheetState extends ConsumerState<VeyaChatSheet> {
           ),
           border: isUser
               ? null
-              : Border.all(color: const Color(0xFF00F2FE).withValues(alpha: 0.3)),
+              : Border.all(
+                  color: const Color(0xFF00F2FE).withValues(alpha: 0.3),
+                ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,22 +253,28 @@ class _VeyaChatSheetState extends ConsumerState<VeyaChatSheet> {
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: message.observations.expand((obs) => obs.evidence).map((cit) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Grounding: ${cit.fact}',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 9,
-                      ),
-                    ),
-                  );
-                }).toList(),
+                children: message.observations
+                    .expand((obs) => obs.evidence)
+                    .map((cit) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Grounding: ${cit.fact}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 9,
+                          ),
+                        ),
+                      );
+                    })
+                    .toList(),
               ),
             ],
           ],

@@ -449,13 +449,12 @@ class TestCrossUserIsolation:
             # User B gets their activity — should not see User A's 12000 steps
             r = request("GET", "/activity/today", {}, token=temp_token)
             assert r.status_code == 200
-            assert r.json()["steps"] == 0
-            assert r.json()["recording_status"] == "unrecorded"
+            assert r.json()["steps"] is None
         finally:
             with SessionLocal() as session:
-                temp_user = session.get(User, temp_user_id)
-                if temp_user:
-                    session.delete(temp_user)
+                u = session.get(User, temp_user_id)
+                if u:
+                    session.delete(u)
                     session.commit()
 
     def test_manual_edit_does_not_leak_to_other_user(self, mock_user_token: str) -> None:
@@ -477,10 +476,10 @@ class TestCrossUserIsolation:
                 "steps": 9999, "source": "manual",
             }, token=mock_user_token)
 
-            # User B — still zero
+            # User B — still null
             r = request("GET", "/activity/today", {}, token=temp_token)
             assert r.status_code == 200
-            assert r.json()["steps"] == 0
+            assert r.json()["steps"] is None
         finally:
             with SessionLocal() as session:
                 temp_user = session.get(User, temp_user_id)

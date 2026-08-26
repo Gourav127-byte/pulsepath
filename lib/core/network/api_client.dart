@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
@@ -22,6 +24,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     baseUrl: ApiConfig.baseUrl,
     client: ref.watch(httpClientProvider),
     authTokenProvider: tokenStorage.readToken,
+    refreshTokenProvider: tokenStorage.readRefreshToken,
+    onTokenRefreshed: (access, refresh) => tokenStorage.saveToken(access, refresh),
     onUnauthorized: () {
       ref.read(unauthorizedProvider.notifier).state = true;
     },
@@ -33,6 +37,8 @@ class ApiClient {
     required String baseUrl,
     required http.Client client,
     this.authTokenProvider,
+    this.refreshTokenProvider,
+    this.onTokenRefreshed,
     this.onUnauthorized,
     this.requestTimeout = const Duration(seconds: 10),
   }) : _baseUri = Uri.parse(baseUrl),
@@ -42,7 +48,11 @@ class ApiClient {
   final http.Client _httpClient;
   final Duration requestTimeout;
   final Future<String?> Function()? authTokenProvider;
+  final Future<String?> Function()? refreshTokenProvider;
+  final Future<void> Function(String accessToken, String refreshToken)? onTokenRefreshed;
   final void Function()? onUnauthorized;
+
+  Completer<String?>? _refreshCompleter;
 
   Future<Map<String, String>> _buildHeaders([String? manualToken]) async {
     final headers = {'Content-Type': 'application/json'};
@@ -53,10 +63,18 @@ class ApiClient {
     return headers;
   }
 
+  Uri _resolveUri(String path) {
+    final base = _baseUri.toString();
+    final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$cleanBase$cleanPath');
+  }
+
   Future<Map<String, dynamic>> getJson(String path) async {
     final headers = await _buildHeaders();
     final decodedBody = await _requestDecoded(
-      () => _httpClient.get(_baseUri.resolve(path), headers: headers),
+      (h) => _httpClient.get(_resolveUri(path), headers: h),
+      initialHeaders: headers,
     );
     if (decodedBody is! Map<String, dynamic>) {
       throw const NetworkException('Response format was invalid.');
@@ -70,7 +88,9 @@ class ApiClient {
   ) async {
     final headers = await _buildHeaders(token);
     final decodedBody = await _requestDecoded(
-      () => _httpClient.get(_baseUri.resolve(path), headers: headers),
+      (h) => _httpClient.get(_resolveUri(path), headers: h),
+      initialHeaders: headers,
+      skipRefresh: true,
     );
     if (decodedBody is! Map<String, dynamic>) {
       throw const NetworkException('Response format was invalid.');
@@ -84,11 +104,12 @@ class ApiClient {
   ) async {
     final headers = await _buildHeaders();
     final decodedBody = await _requestDecoded(
-      () => _httpClient.patch(
-        _baseUri.resolve(path),
-        headers: headers,
+      (h) => _httpClient.patch(
+        _resolveUri(path),
+        headers: h,
         body: jsonEncode(body),
       ),
+      initialHeaders: headers,
     );
     if (decodedBody is! Map<String, dynamic>) {
       throw const NetworkException('Response format was invalid.');
@@ -102,11 +123,13 @@ class ApiClient {
   ) async {
     final headers = await _buildHeaders();
     final decodedBody = await _requestDecoded(
-      () => _httpClient.post(
-        _baseUri.resolve(path),
-        headers: headers,
+      (h) => _httpClient.post(
+        _resolveUri(path),
+        headers: h,
         body: jsonEncode(body),
       ),
+      initialHeaders: headers,
+      skipRefresh: path.startsWith('/auth/'),
     );
     if (decodedBody is! Map<String, dynamic>) {
       throw const NetworkException('Response format was invalid.');
@@ -117,14 +140,16 @@ class ApiClient {
   Future<void> delete(String path) async {
     final headers = await _buildHeaders();
     await _send(
-      () => _httpClient.delete(_baseUri.resolve(path), headers: headers),
+      (h) => _httpClient.delete(_resolveUri(path), headers: h),
+      initialHeaders: headers,
     );
   }
 
   Future<List<Map<String, dynamic>>> getJsonList(String path) async {
     final headers = await _buildHeaders();
     final decodedBody = await _requestDecoded(
-      () => _httpClient.get(_baseUri.resolve(path), headers: headers),
+      (h) => _httpClient.get(_baseUri.resolve(path), headers: h),
+      initialHeaders: headers,
     );
     if (decodedBody is! List) {
       throw const NetworkException('Response format was invalid.');
@@ -137,8 +162,12 @@ class ApiClient {
     }
   }
 
-  Future<Object?> _requestDecoded(Future<http.Response> Function() send) async {
-    final response = await _send(send);
+  Future<Object?> _requestDecoded(
+    Future<http.Response> Function(Map<String, String> headers) send, {
+    required Map<String, String> initialHeaders,
+    bool skipRefresh = false,
+  }) async {
+    final response = await _send(send, initialHeaders: initialHeaders, skipRefresh: skipRefresh);
     try {
       return jsonDecode(response.body);
     } on FormatException {
@@ -146,12 +175,24 @@ class ApiClient {
     }
   }
 
-  Future<http.Response> _send(Future<http.Response> Function() send) async {
+  Future<http.Response> _send(
+    Future<http.Response> Function(Map<String, String> headers) send, {
+    required Map<String, String> initialHeaders,
+    bool skipRefresh = false,
+  }) async {
     try {
-      final response = await send().timeout(requestTimeout);
+      var response = await send(initialHeaders).timeout(requestTimeout);
 
-      if (response.statusCode == 401) {
-        onUnauthorized?.call();
+      // Handle 401 Single-Flight Refresh
+      if (response.statusCode == 401 && !skipRefresh) {
+        final newToken = await _performSingleFlightRefresh();
+        if (newToken != null) {
+          final retriedHeaders = Map<String, String>.from(initialHeaders);
+          retriedHeaders['Authorization'] = 'Bearer $newToken';
+          response = await send(retriedHeaders).timeout(requestTimeout);
+        } else {
+          onUnauthorized?.call();
+        }
       }
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -162,7 +203,7 @@ class ApiClient {
             detail = decoded['detail'] as String;
           }
         } on FormatException {
-          // Keep the safe status-based error when the backend body is invalid.
+          // Keep default status message
         }
         throw NetworkException(
           'Request failed with status ${response.statusCode}.',
@@ -174,12 +215,58 @@ class ApiClient {
       return response;
     } on NetworkException {
       rethrow;
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] TimeoutException | type: ${e.runtimeType}');
       throw const NetworkException('Request timed out.');
-    } on SocketException {
+    } on SocketException catch (e) {
+      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] SocketException | type: ${e.runtimeType}');
       throw const NetworkException('Could not connect to the server.');
-    } on http.ClientException {
+    } on http.ClientException catch (e) {
+      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] ClientException | type: ${e.runtimeType}');
       throw const NetworkException('Could not connect to the server.');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] Exception | type: ${e.runtimeType}');
+      throw const NetworkException('Could not connect to the server.');
+    }
+  }
+
+  Future<String?> _performSingleFlightRefresh() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<String?>();
+    try {
+      final refreshToken = await refreshTokenProvider?.call();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+
+      final response = await _httpClient
+          .post(
+            _resolveUri('/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final newAccess = decoded['access_token'] as String;
+        final newRefresh = decoded['refresh_token'] as String;
+        await onTokenRefreshed?.call(newAccess, newRefresh);
+        _refreshCompleter!.complete(newAccess);
+        return newAccess;
+      } else {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+    } on Object {
+      _refreshCompleter!.complete(null);
+      return null;
+    } finally {
+      _refreshCompleter = null;
     }
   }
 }

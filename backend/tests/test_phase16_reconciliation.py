@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 import uuid
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -165,6 +165,46 @@ async def test_manual_active_minutes_never_writes_health_connect_field(
 
 
 @pytest.mark.anyio
+async def test_active_minutes_reconcile_manual_and_workout_without_heuristic(
+    temp_user_token,
+):
+    manual = await patch(
+        "/activity/today",
+        json={"source": "manual", "steps": 10000, "active_minutes": 30},
+        token=temp_user_token,
+    )
+    assert manual.status_code == 200
+    assert manual.json()["active_minutes"] == 30
+
+    health_connect = await patch(
+        "/activity/today",
+        json={"source": "health_connect", "active_minutes": 45},
+        token=temp_user_token,
+    )
+
+    assert health_connect.status_code == 200
+    assert health_connect.json()["active_minutes"] == 45
+    activity = activity_for_token(temp_user_token)
+    assert activity.active_minutes_manual == 30
+    assert activity.active_minutes_health_connect == 45
+
+
+@pytest.mark.anyio
+async def test_steps_only_never_create_active_minutes(temp_user_token):
+    response = await patch(
+        "/activity/today",
+        json={"source": "health_connect", "steps": 10000},
+        token=temp_user_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["active_minutes"] is None
+    activity = activity_for_token(temp_user_token)
+    assert activity.active_minutes_manual is None
+    assert activity.active_minutes_health_connect is None
+
+
+@pytest.mark.anyio
 async def test_reset_to_auto_clears_pending_reduction_state(temp_user_token):
     await patch(
         "/activity/today",
@@ -210,17 +250,13 @@ async def test_reset_flag_does_not_record_untouched_fresh_activity(temp_user_tok
     assert r.json()["source"] == "system"
     assert r.json()["steps_provenance"] == "system"
 
+
 @pytest.mark.anyio
 async def test_fresh_day_and_mixed_metrics(temp_user_token):
-    from app.db.database import SessionLocal
-    db_session = SessionLocal()
-
-
-    # Fresh day
     r = await get("/activity/today", token=temp_user_token)
     assert r.status_code == 200
     assert r.json()["steps_provenance"] == "system"
-    assert r.json()["steps"] == 0
+    assert r.json()["steps"] is None
 
     # HC syncs steps 5000
     await patch("/activity/today", json={"source": "health_connect", "steps": 5000}, token=temp_user_token)
@@ -232,11 +268,6 @@ async def test_fresh_day_and_mixed_metrics(temp_user_token):
     assert r.json()["calories_provenance"] == "manual"
     assert r.json()["steps"] == 5000
     assert r.json()["calories"] == 400
-
-@pytest.mark.anyio
-def test_migration_backfill(seeded_database):
-    from app.db.database import SessionLocal
-    from app.db.models.user import User
     from sqlalchemy import select
     from datetime import date, timezone, datetime
     import uuid

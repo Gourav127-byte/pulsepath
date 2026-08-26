@@ -10,72 +10,104 @@ class DailyScoreExplanationSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final explanation = ref.watch(dailyScoreExplanationProvider);
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+    final explanationAsync = ref.watch(dailyScoreExplanationProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.72,
+      minChildSize: 0.45,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: PulsePathColors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: PulsePathColors.divider,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Why this score?',
-                style: Theme.of(context).textTheme.headlineSmall,
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Daily Score Breakdown',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Calculated on the server from today’s activity and score rules.',
-                style: TextStyle(color: PulsePathColors.textSecondary),
-              ),
-              const SizedBox(height: 20),
-              explanation.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => Center(
-                  child: TextButton(
-                    onPressed: () =>
-                        ref.invalidate(dailyScoreExplanationProvider),
-                    child: const Text('Could not load explanation · Retry'),
+              const SizedBox(height: 12),
+              Expanded(
+                child: explanationAsync.when(
+                  data: (explanation) => _ExplanationContent(
+                    explanation: explanation,
+                    controller: scrollController,
+                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (err, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Could not load score breakdown.'),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              ref.invalidate(dailyScoreExplanationProvider),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                data: (value) => _ExplanationContent(explanation: value),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
 class _ExplanationContent extends StatelessWidget {
-  const _ExplanationContent({required this.explanation});
+  const _ExplanationContent({
+    required this.explanation,
+    required this.controller,
+  });
 
   final DailyScoreExplanation explanation;
+  final ScrollController controller;
 
   @override
   Widget build(BuildContext context) {
-    if (!explanation.available) {
-      return Text(
-        explanation.message ?? 'This score breakdown is unavailable.',
-        key: const Key('score_explanation_unavailable'),
-        style: const TextStyle(color: PulsePathColors.textSecondary),
-      );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return ListView(
+      controller: controller,
       children: [
+        if (explanation.message != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: PulsePathColors.surfaceBright,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              explanation.message!,
+              style: const TextStyle(
+                color: PulsePathColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         for (final component in explanation.components)
           _ComponentRow(component: component),
         const Divider(height: 28),
@@ -84,7 +116,7 @@ class _ExplanationContent extends StatelessWidget {
           children: [
             Text('Daily Score', style: Theme.of(context).textTheme.titleMedium),
             Text(
-              explanation.score.round().toString(),
+              explanation.score != null ? explanation.score!.round().toString() : '--',
               key: const Key('explained_daily_score'),
               style: Theme.of(
                 context,
@@ -111,13 +143,15 @@ class _ComponentRow extends StatelessWidget {
       _ => component.metric,
     };
     final weight = (component.weight * 100).round();
-    final points = component.points.toStringAsFixed(1);
+    final points = component.points != null ? component.points!.toStringAsFixed(1) : '--';
     final value = _formatValue(component.value);
     final target = component.target;
-    final detail = target == null
-        ? 'No goal set · 0.0% progress'
-        : '$value / ${_formatValue(target)} ${_unit(component.metric)} · '
-              '${(component.progress * 100).toStringAsFixed(1)}%';
+    final detail = component.status == 'unrecorded' || component.value == null
+        ? 'Not recorded'
+        : (target == null
+              ? 'No goal set'
+              : '$value / ${_formatValue(target)} ${_unit(component.metric)} · '
+                '${((component.progress ?? 0) * 100).toStringAsFixed(1)}%');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
@@ -128,7 +162,7 @@ class _ComponentRow extends StatelessWidget {
               children: [
                 Text(
                   '$label · $weight% weight',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -154,7 +188,8 @@ class _ComponentRow extends StatelessWidget {
     );
   }
 
-  String _formatValue(double value) {
+  String _formatValue(double? value) {
+    if (value == null) return '--';
     final digits = value.round().toString();
     return digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
   }

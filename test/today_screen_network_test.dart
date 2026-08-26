@@ -69,14 +69,16 @@ void main() {
     });
 
     await tester.pumpWidget(_testApp(client));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text("Could not load today's activity."), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Retry'));
     await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(activityRequestCount, 2);
     expect(find.text('77'), findsOneWidget);

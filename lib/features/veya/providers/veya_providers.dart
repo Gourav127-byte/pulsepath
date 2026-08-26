@@ -12,20 +12,20 @@ final veyaRepositoryProvider = Provider<VeyaRepository>((ref) {
 
 final veyaFoundationProvider =
     FutureProvider.family<VeyaFoundationResponse, int>((ref, days) async {
-  final repository = ref.watch(veyaRepositoryProvider);
-  return repository.fetchFoundation(days: days);
-});
+      final repository = ref.watch(veyaRepositoryProvider);
+      return repository.fetchFoundation(days: days);
+    });
 
 class VeyaChatNotifier extends StateNotifier<List<VeyaChatMessage>> {
   final VeyaRepository _repository;
 
   VeyaChatNotifier(this._repository)
-      : super([
-          VeyaChatMessage.assistant(
-            text:
-                "Hello! I am VEYA, your evidence-grounded activity intelligence assistant. Ask me anything about your recorded steps, streak, consistency, or activity trends.",
-          ),
-        ]);
+    : super([
+        VeyaChatMessage.assistant(
+          text:
+              "Hello! I am VEYA, your evidence-grounded activity intelligence assistant. Ask me anything about your recorded steps, streak, consistency, or activity trends.",
+        ),
+      ]);
 
   bool _isSending = false;
   bool get isSending => _isSending;
@@ -72,6 +72,6 @@ class VeyaChatNotifier extends StateNotifier<List<VeyaChatMessage>> {
 
 final veyaChatProvider =
     StateNotifierProvider<VeyaChatNotifier, List<VeyaChatMessage>>((ref) {
-  final repository = ref.watch(veyaRepositoryProvider);
-  return VeyaChatNotifier(repository);
-});
+      final repository = ref.watch(veyaRepositoryProvider);
+      return VeyaChatNotifier(repository);
+    });

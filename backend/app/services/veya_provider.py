@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Protocol
 
 import httpx
@@ -10,6 +11,8 @@ from app.services.veya_grounding import (
     VeyaGroundingError,
     validate_and_ground_veya_response,
 )
+from app.services.veya_telemetry import log_grounding_result, log_provider_call
+from app.services.veya_usage import veya_usage_tracker
 
 
 class VeyaProviderUnavailableError(RuntimeError):
@@ -52,6 +55,8 @@ class HttpVeyaProvider:
             self.endpoint = "https://api.openai.com/v1/chat/completions"
         self.timeout_seconds = timeout_seconds
         self._custom_client = client
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
 
     async def generate(self, request: VeyaProviderRequest) -> VeyaStructuredResponse:
         headers = {
@@ -98,6 +103,14 @@ class HttpVeyaProvider:
             data = response.json()
             if not isinstance(data, dict):
                 raise TypeError("Response root must be a JSON object")
+
+            usage = data.get("usage")
+            if isinstance(usage, dict):
+                self.last_prompt_tokens = usage.get("prompt_tokens", 0)
+                self.last_completion_tokens = usage.get("completion_tokens", 0)
+            else:
+                self.last_prompt_tokens = 0
+                self.last_completion_tokens = 0
 
             choices = data.get("choices")
             if not choices or not isinstance(choices, list):
@@ -153,11 +166,73 @@ def get_veya_provider() -> VeyaProvider:
 async def generate_veya_response(
     provider: VeyaProvider,
     request: VeyaProviderRequest,
+    user_id: UUID | None = None,
 ) -> VeyaStructuredResponse:
+    provider_name = getattr(provider, "model", type(provider).__name__)
+    start_time = time.time()
     try:
         raw_response = await provider.generate(request)
-        return validate_and_ground_veya_response(raw_response, request.evidence)
-    except (VeyaProviderUnavailableError, VeyaGroundingError):
+        provider_duration = (time.time() - start_time) * 1000.0
+        prompt_tokens = getattr(provider, "last_prompt_tokens", 0)
+        completion_tokens = getattr(provider, "last_completion_tokens", 0)
+
+        log_provider_call(
+            provider_name=type(provider).__name__,
+            model_name=str(provider_name),
+            duration_ms=provider_duration,
+            status="success",
+        )
+
+        veya_usage_tracker.record_usage(
+            user_id=user_id,
+            success=True,
+            duration_ms=provider_duration,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+        grounding_start = time.time()
+        grounded = validate_and_ground_veya_response(raw_response, request.evidence)
+        grounding_duration = (time.time() - grounding_start) * 1000.0
+        log_grounding_result(
+            duration_ms=grounding_duration,
+            status="passed",
+        )
+        return grounded
+    except VeyaGroundingError as exc:
+        grounding_duration = (time.time() - start_time) * 1000.0
+        log_grounding_result(
+            duration_ms=grounding_duration,
+            status="rejected",
+            error_type=type(exc).__name__,
+        )
+        return VeyaStructuredResponse(
+            status="provider_unavailable",
+            summary="VEYA insights are temporarily unavailable.",
+            limitations=(
+                "No AI interpretation was generated.",
+                "Verified PulsePath evidence remains available in this response.",
+            ),
+        )
+    except VeyaProviderUnavailableError as exc:
+        provider_duration = (time.time() - start_time) * 1000.0
+        is_timeout = "timed out" in str(exc).lower()
+
+        log_provider_call(
+            provider_name=type(provider).__name__,
+            model_name=str(provider_name),
+            duration_ms=provider_duration,
+            status="failed",
+            error_type=type(exc).__name__,
+        )
+
+        veya_usage_tracker.record_usage(
+            user_id=user_id,
+            success=False,
+            is_timeout=is_timeout,
+            duration_ms=provider_duration,
+        )
+
         return VeyaStructuredResponse(
             status="provider_unavailable",
             summary="VEYA insights are temporarily unavailable.",

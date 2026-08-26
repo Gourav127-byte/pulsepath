@@ -81,7 +81,7 @@ class DailyScoreCard extends StatelessWidget {
 
           final compact = constraints.maxWidth < 320;
           final scoreRing = _ScoreRing(
-            score: score!,
+            score: score,
             size: compact ? 130 : 150,
           );
           final summary = _ScoreSummary(
@@ -169,7 +169,7 @@ class _ScoreSummary extends StatelessWidget {
 class _ScoreRing extends StatelessWidget {
   const _ScoreRing({required this.score, required this.size});
 
-  final int score;
+  final int? score;
   final double size;
 
   @override
@@ -177,11 +177,14 @@ class _ScoreRing extends StatelessWidget {
     return SizedBox.square(
       dimension: size,
       child: CustomPaint(
-        painter: _ScoreRingPainter(progress: score / 100),
+        painter: _ScoreRingPainter(progress: (score ?? 0) / 100),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('$score', style: Theme.of(context).textTheme.displaySmall),
+            Text(
+              score != null ? '$score' : '--',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
             const SizedBox(height: 2),
             Text(
               'DAILY SCORE',

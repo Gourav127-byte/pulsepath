@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" />
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <!-- health 11.1.1 maps WORKOUT reads to exercise, distance, and total
+         calories permissions internally. PulsePath still displays/syncs
+         ACTIVE_ENERGY_BURNED as its calorie metric. -->
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
 
     <application
         android:label="pulsepath"

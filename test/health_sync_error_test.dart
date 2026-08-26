@@ -93,6 +93,12 @@ class MockTodayRepo implements TodayActivityRepository {
   Future<ActivityEngagement> fetchEngagement() async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> syncTimelineSamples({
+    required DateTime date,
+    required List<StepSampleRecord> samples,
+  }) async {}
 }
 
 class MockHistoryRepo implements ActivityHistoryRepository {

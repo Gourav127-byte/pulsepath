@@ -1,37 +1,138 @@
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../../../core/cache/temporary_demo_cache.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_config.dart';
 import '../models/auth_session.dart';
 import '../models/auth_user.dart';
 import 'token_storage.dart';
 
+class PhoneOTPResult {
+  const PhoneOTPResult({
+    required this.message,
+    required this.cooldownSeconds,
+    this.developmentOtp,
+  });
+
+  final String message;
+  final int cooldownSeconds;
+  final String? developmentOtp;
+}
+
+class EmailOTPResult {
+  const EmailOTPResult({
+    required this.message,
+    required this.cooldownSeconds,
+    this.developmentOtp,
+  });
+
+  final String message;
+  final int cooldownSeconds;
+  final String? developmentOtp;
+}
+
 class AuthRepository {
-  const AuthRepository(this._apiClient, this._tokenStorage);
+  const AuthRepository(this._apiClient, this._tokenStorage, [this._cache]);
 
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
+  final TemporaryDemoCache? _cache;
 
   Future<AuthSession> login({required String email, required String password}) {
-    return _authenticate('/auth/login', email: email, password: password);
+    return _authenticate('/auth/login', {'email': email.trim().toLowerCase(), 'password': password});
   }
 
   Future<AuthSession> register({
     required String email,
     required String password,
   }) {
-    return _authenticate('/auth/register', email: email, password: password);
+    return _authenticate('/auth/register', {'email': email.trim().toLowerCase(), 'password': password});
+  }
+
+  Future<PhoneOTPResult> requestPhoneOTP(String phone) async {
+    try {
+      final response = await _apiClient.postJson('/auth/phone/request-otp', {'phone_number': phone});
+      return PhoneOTPResult(
+        message: (response['message'] as String?) ?? 'OTP dispatched',
+        cooldownSeconds: (response['cooldown_seconds'] as int?) ?? 60,
+        developmentOtp: response['development_otp'] as String?,
+      );
+    } on NetworkException catch (error) {
+      throw AuthException(_messageFor(error));
+    } on Object {
+      throw const AuthException('The server returned an invalid response.');
+    }
+  }
+
+  Future<AuthSession> verifyPhoneOTP(String phone, String otp) async {
+    return _authenticate('/auth/phone/verify-otp', {'phone_number': phone, 'otp': otp.trim()});
+  }
+
+  Future<EmailOTPResult> requestEmailOTP(String email) async {
+    try {
+      final response = await _apiClient.postJson('/auth/email/request-otp', {'email': email.trim().toLowerCase()});
+      return EmailOTPResult(
+        message: (response['message'] as String?) ?? 'OTP dispatched',
+        cooldownSeconds: (response['cooldown_seconds'] as int?) ?? 60,
+        developmentOtp: response['development_otp'] as String?,
+      );
+    } on NetworkException catch (error) {
+      throw AuthException(_messageFor(error));
+    } on Object {
+      throw const AuthException('The server returned an invalid response.');
+    }
+  }
+
+  Future<AuthSession> verifyEmailOTP(String email, String otp) async {
+    return _authenticate('/auth/email/verify-otp', {'email': email.trim().toLowerCase(), 'otp': otp.trim()});
+  }
+
+  Future<AuthSession> loginWithGoogle(String idToken) async {
+    return _authenticate('/auth/google', {'id_token': idToken});
+  }
+
+  static bool _googleSignInInFlight = false;
+
+  Future<AuthSession> signInWithGoogleNative() async {
+    if (_googleSignInInFlight) {
+      throw const AuthException('Google sign in is already in progress.');
+    }
+    _googleSignInInFlight = true;
+    try {
+      final clientId = ApiConfig.googleClientId.isNotEmpty ? ApiConfig.googleClientId : null;
+      final googleSignIn = GoogleSignIn(
+        serverClientId: clientId,
+        scopes: ['email'],
+      );
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw const AuthException('Google sign in was cancelled.');
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const AuthException('Could not retrieve Google ID token.');
+      }
+      return await loginWithGoogle(idToken);
+    } on AuthException {
+      rethrow;
+    } catch (error) {
+      throw AuthException('Google Sign-In failed: $error');
+    } finally {
+      _googleSignInInFlight = false;
+    }
   }
 
   Future<AuthSession> _authenticate(
-    String path, {
-    required String email,
-    required String password,
-  }) async {
+    String path,
+    Map<String, Object?> body,
+  ) async {
     try {
-      final response = await _apiClient.postJson(path, {
-        'email': email.trim().toLowerCase(),
-        'password': password,
-      });
+      final response = await _apiClient.postJson(path, body);
       final session = AuthSession.fromJson(response);
-      await _tokenStorage.saveToken(session.accessToken);
+      final cacheFuture = _cache?.saveProfile({'id': session.user.id, 'email': session.user.email});
+      await _tokenStorage.saveToken(session.accessToken, session.refreshToken);
+      if (cacheFuture != null) await cacheFuture;
       return session;
     } on NetworkException catch (error) {
       throw AuthException(_messageFor(error));
@@ -75,19 +176,26 @@ class AuthRepository {
     if (token == null || token.isEmpty) return null;
     try {
       final response = await _apiClient.getJsonWithBearer('/auth/me', token);
-      return AuthUser.fromJson(response);
+      final user = AuthUser.fromJson(response);
+      await _cache?.saveProfile({'id': user.id, 'email': user.email});
+      return user;
     } on NetworkException catch (error) {
-      if (error.statusCode != 401) {
-        throw const AuthException(
-          'Could not verify your session. Check your connection and retry.',
+      if (error.statusCode == 401) {
+        try {
+          await _tokenStorage.deleteToken();
+        } on Object {}
+        return null;
+      }
+      // OFFLINE / UNREACHABLE BACKEND: Preserve session and restore cached profile!
+      final cached = await _cache?.loadProfile();
+      if (cached != null && cached['id'] is String) {
+        return AuthUser(
+          id: cached['id'] as String,
+          email: (cached['email'] as String?) ?? '',
         );
       }
-      try {
-        await _tokenStorage.deleteToken();
-      } on Object {
-        // A platform storage failure must not trap startup on session checking.
-      }
-      return null;
+      // If no cached profile but token exists, return offline session fallback
+      return const AuthUser(id: 'offline-user', email: 'offline@pulsepath.local');
     } on AuthException {
       rethrow;
     } on Object {
@@ -95,17 +203,27 @@ class AuthRepository {
     }
   }
 
-  Future<void> logout() => _tokenStorage.deleteToken();
+  Future<void> logout() async {
+    final refresh = await _tokenStorage.readRefreshToken();
+    if (refresh != null) {
+      try {
+        await _apiClient.postJson('/auth/logout', {'refresh_token': refresh});
+      } on Object {}
+    }
+    await _tokenStorage.deleteToken();
+  }
 
   String _messageFor(NetworkException error) {
     if (error.statusCode == 401) {
-      return 'Invalid email or password.';
+      return error.message.isNotEmpty && error.message != 'Unauthorized'
+          ? error.message
+          : 'Invalid credentials.';
     }
     if (error.statusCode == 409) {
-      return 'An account with this email already exists.';
+      return 'An account with this email or phone already exists.';
     }
     if (error.statusCode == 400) {
-      return 'The reset token is invalid or expired.';
+      return 'The code or token is invalid or expired.';
     }
     if (error.statusCode == 422) {
       return 'Please check the information you entered.';

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.activity import (
@@ -23,6 +23,9 @@ from app.services.veya_provider import (
     generate_veya_response,
     get_veya_provider,
 )
+from app.services.veya_rate_limit import veya_rate_limiter
+from app.services.veya_telemetry import log_rate_limit_rejection
+from app.services.veya_usage import veya_usage_tracker
 
 
 router = APIRouter(prefix="/veya", tags=["veya"])
@@ -35,6 +38,14 @@ async def get_veya_foundation(
     provider: Annotated[VeyaProvider, Depends(get_veya_provider)],
     days: Annotated[int, Query()] = 7,
 ) -> VeyaFoundationResponse:
+    try:
+        veya_usage_tracker.check_daily_quota(user.id)
+        veya_rate_limiter.check_and_record(user.id)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            log_rate_limit_rejection(user.id)
+        raise exc
+
     # These existing authenticated handlers remain the authoritative fact source.
     history = get_activity_history(db=db, user=user, days=days)
     insights = get_activity_insights(db=db, user=user, days=days)
@@ -48,6 +59,7 @@ async def get_veya_foundation(
     response = await generate_veya_response(
         provider,
         VeyaProviderRequest(evidence=evidence),
+        user_id=user.id,
     )
     return VeyaFoundationResponse(evidence=evidence, response=response)
 
@@ -59,6 +71,21 @@ async def post_veya_chat(
     user: Annotated[User, Depends(get_current_user)],
     provider: Annotated[VeyaProvider, Depends(get_veya_provider)],
 ) -> VeyaChatResponse:
+    clean_msg = payload.message.strip()
+    if not clean_msg:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Chat message cannot be empty or whitespace-only",
+        )
+
+    try:
+        veya_usage_tracker.check_daily_quota(user.id)
+        veya_rate_limiter.check_and_record(user.id)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            log_rate_limit_rejection(user.id)
+        raise exc
+
     history = get_activity_history(db=db, user=user, days=payload.range_days)
     insights = get_activity_insights(db=db, user=user, days=payload.range_days)
     engagement = get_activity_engagement(db=db, user=user)
@@ -71,11 +98,12 @@ async def post_veya_chat(
     provider_res = await generate_veya_response(
         provider,
         VeyaProviderRequest(evidence=evidence),
+        user_id=user.id,
     )
 
     if provider_res.status == "provider_unavailable":
         return VeyaChatResponse(
-            query=payload.message,
+            query=clean_msg,
             reply=f"VEYA is currently operating in offline evidence mode. {evidence.integrity.rationale}",
             evidence=evidence,
             observations=(),
@@ -83,7 +111,7 @@ async def post_veya_chat(
         )
 
     return VeyaChatResponse(
-        query=payload.message,
+        query=clean_msg,
         reply=provider_res.summary,
         evidence=evidence,
         observations=provider_res.observations,

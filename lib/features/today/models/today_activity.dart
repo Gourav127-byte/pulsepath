@@ -1,11 +1,11 @@
 class TodayActivity {
   const TodayActivity({
     required this.date,
-    required this.steps,
-    required this.activeMinutes,
-    required this.distance,
-    required this.calories,
-    required this.dailyScore,
+    this.steps,
+    this.activeMinutes,
+    this.distance,
+    this.calories,
+    this.dailyScore,
     required this.scoreVersion,
     required this.source,
     this.recordingStatus = ActivityRecordingStatus.legacyUnknown,
@@ -18,11 +18,19 @@ class TodayActivity {
   factory TodayActivity.fromJson(Map<String, dynamic> json) {
     return TodayActivity(
       date: DateTime.parse(json['date'] as String),
-      steps: (json['steps'] as num).toDouble(),
-      activeMinutes: (json['active_minutes'] as num).toDouble(),
-      distance: (json['distance'] as num).toDouble(),
-      calories: (json['calories'] as num).toDouble(),
-      dailyScore: (json['daily_score'] as num).toDouble(),
+      steps: json['steps'] != null ? (json['steps'] as num).toDouble() : null,
+      activeMinutes: json['active_minutes'] != null
+          ? (json['active_minutes'] as num).toDouble()
+          : null,
+      distance: json['distance'] != null
+          ? (json['distance'] as num).toDouble()
+          : null,
+      calories: json['calories'] != null
+          ? (json['calories'] as num).toDouble()
+          : null,
+      dailyScore: json['daily_score'] != null
+          ? (json['daily_score'] as num).toDouble()
+          : null,
       scoreVersion: json['score_version'] as String,
       source: json['source'] as String,
       recordingStatus: ActivityRecordingStatus.fromJson(
@@ -37,11 +45,11 @@ class TodayActivity {
   }
 
   final DateTime date;
-  final double steps;
-  final double activeMinutes;
-  final double distance;
-  final double calories;
-  final double dailyScore;
+  final double? steps;
+  final double? activeMinutes;
+  final double? distance;
+  final double? calories;
+  final double? dailyScore;
   final String scoreVersion;
   final String source;
   final ActivityRecordingStatus recordingStatus;

@@ -19,11 +19,11 @@ final healthSyncRepositoryProvider = Provider<HealthSyncRepository>((ref) {
 enum HealthSyncStatus { idle, syncing, success, error, unauthorized }
 
 class HealthSyncState {
-  const HealthSyncState({required this.status, this.message, this.lastSync});
+  const HealthSyncState({required this.status, this.message, this.lastSuccessfulSync});
 
   final HealthSyncStatus status;
   final String? message;
-  final DateTime? lastSync;
+  final DateTime? lastSuccessfulSync;
 }
 
 class HealthSyncController extends StateNotifier<HealthSyncState> {
@@ -32,47 +32,68 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
 
   final HealthSyncRepository _repository;
   final Ref _ref;
+  static const syncFreshnessThreshold = Duration(minutes: 5);
+
+  Future<void> syncIfStale() async {
+    if (state.status == HealthSyncStatus.syncing) return;
+
+    final last = state.lastSuccessfulSync;
+    if (last != null && DateTime.now().difference(last) < syncFreshnessThreshold) {
+      return; // Skip sync if fresh (< 5 mins)
+    }
+
+    try {
+      await sync();
+    } catch (_) {
+      // Prevent unhandled plugin exceptions from affecting UI
+    }
+  }
 
   Future<void> sync() async {
     if (state.status == HealthSyncStatus.syncing) return;
 
     if (defaultTargetPlatform != TargetPlatform.android) {
-      state = const HealthSyncState(
+      state = HealthSyncState(
         status: HealthSyncStatus.error,
         message: 'Health Connect is only supported on Android.',
+        lastSuccessfulSync: state.lastSuccessfulSync,
       );
       return;
     }
 
     state = HealthSyncState(
       status: HealthSyncStatus.syncing,
-      lastSync: state.lastSync,
+      lastSuccessfulSync: state.lastSuccessfulSync,
     );
 
     try {
       final service = _ref.read(healthConnectServiceProvider);
       if (!await service.isAvailable()) {
-        state = const HealthSyncState(
+        state = HealthSyncState(
           status: HealthSyncStatus.error,
           message: 'Health Connect is not available on this device.',
+          lastSuccessfulSync: state.lastSuccessfulSync,
         );
         return;
       }
 
       final outcome = await _repository.sync();
       if (outcome == HealthSyncOutcome.unavailable) {
-        state = const HealthSyncState(
+        state = HealthSyncState(
           status: HealthSyncStatus.error,
           message: 'Health Connect is not available on this device.',
+          lastSuccessfulSync: state.lastSuccessfulSync,
         );
         return;
       }
+
+      // ONLY UPDATE lastSuccessfulSync on actual successful sync
       state = HealthSyncState(
         status: HealthSyncStatus.success,
         message: outcome == HealthSyncOutcome.noData
             ? 'No Health Connect records found for today.'
             : null,
-        lastSync: DateTime.now(),
+        lastSuccessfulSync: DateTime.now(),
       );
 
       // Refresh the Today activity provider to show new data
@@ -87,13 +108,13 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
       state = HealthSyncState(
         status: HealthSyncStatus.unauthorized,
         message: 'Health Connect permissions were not granted.',
-        lastSync: state.lastSync,
+        lastSuccessfulSync: state.lastSuccessfulSync,
       );
     } on Object {
       state = HealthSyncState(
         status: HealthSyncStatus.error,
         message: 'Failed to sync health data.',
-        lastSync: state.lastSync,
+        lastSuccessfulSync: state.lastSuccessfulSync,
       );
     }
   }
@@ -104,16 +125,18 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
           .read(healthConnectServiceProvider)
           .requestPermissions();
       if (!granted) {
-        state = const HealthSyncState(
+        state = HealthSyncState(
           status: HealthSyncStatus.unauthorized,
           message: 'Health Connect permissions were not granted.',
+          lastSuccessfulSync: state.lastSuccessfulSync,
         );
       }
       return granted;
     } on Object {
-      state = const HealthSyncState(
+      state = HealthSyncState(
         status: HealthSyncStatus.error,
         message: 'Could not request Health Connect permissions.',
+        lastSuccessfulSync: state.lastSuccessfulSync,
       );
       return false;
     }

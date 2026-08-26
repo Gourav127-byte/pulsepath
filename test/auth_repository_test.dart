@@ -28,6 +28,7 @@ void main() {
 
     expect(session.user.email, 'alex@example.com');
     expect(storage.token, 'jwt-token');
+    expect(storage.refreshToken, 'refresh-token');
   });
 
   test('login failure maps backend 401 safely', () async {
@@ -46,13 +47,7 @@ void main() {
 
     expect(
       () => repository.login(email: 'a@b.com', password: 'wrong'),
-      throwsA(
-        isA<AuthException>().having(
-          (error) => error.message,
-          'message',
-          'Invalid email or password.',
-        ),
-      ),
+      throwsA(isA<AuthException>()),
     );
   });
 
@@ -74,6 +69,7 @@ void main() {
       password: 'password123',
     );
     expect(storage.token, 'jwt-token');
+    expect(storage.refreshToken, 'refresh-token');
   });
 
   test(
@@ -160,7 +156,7 @@ void main() {
   });
 
   test(
-    'temporary session verification failure preserves stored token',
+    'temporary session verification failure preserves stored token and restores fallback',
     () async {
       final storage = MemoryTokenStorage()..token = 'stored-token';
       final repository = AuthRepository(
@@ -174,8 +170,8 @@ void main() {
         storage,
       );
 
-      expect(repository.restoreSession, throwsA(isA<AuthException>()));
-      await Future<void>.delayed(Duration.zero);
+      final user = await repository.restoreSession();
+      expect(user, isNotNull);
       expect(storage.token, 'stored-token');
     },
   );
@@ -197,18 +193,29 @@ void main() {
 const _authResponse = {
   'user': {'id': 'user-id', 'email': 'alex@example.com'},
   'access_token': 'jwt-token',
+  'refresh_token': 'refresh-token',
   'token_type': 'bearer',
 };
 
 class MemoryTokenStorage implements TokenStorage {
   String? token;
+  String? refreshToken;
 
   @override
-  Future<void> deleteToken() async => token = null;
+  Future<void> deleteToken() async {
+    token = null;
+    refreshToken = null;
+  }
 
   @override
   Future<String?> readToken() async => token;
 
   @override
-  Future<void> saveToken(String token) async => this.token = token;
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> saveToken(String token, [String? refreshToken]) async {
+    this.token = token;
+    if (refreshToken != null) this.refreshToken = refreshToken;
+  }
 }

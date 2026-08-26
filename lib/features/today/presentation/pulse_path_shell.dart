@@ -60,6 +60,8 @@ class _PulsePathShellState extends ConsumerState<PulsePathShell>
     ),
   ];
 
+  final Set<int> _visitedTabs = {0};
+
   @override
   void initState() {
     super.initState();
@@ -85,16 +87,19 @@ class _PulsePathShellState extends ConsumerState<PulsePathShell>
   @override
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(selectedTabProvider);
+    if (!_visitedTabs.contains(selectedIndex)) {
+      _visitedTabs.add(selectedIndex);
+    }
 
     return Scaffold(
       body: IndexedStack(
         index: selectedIndex,
-        children: const [
-          TodayScreen(),
-          JourneyScreen(),
-          VeyaScreen(),
-          GoalsScreen(),
-          ProfileScreen(),
+        children: [
+          const TodayScreen(),
+          _visitedTabs.contains(1) ? const JourneyScreen() : const SizedBox.shrink(),
+          _visitedTabs.contains(2) ? const VeyaScreen() : const SizedBox.shrink(),
+          _visitedTabs.contains(3) ? const GoalsScreen() : const SizedBox.shrink(),
+          _visitedTabs.contains(4) ? const ProfileScreen() : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

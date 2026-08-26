@@ -23,13 +23,15 @@ void main() {
     var now = DateTime(2026, 8, 14, 12);
     var fetches = 0;
     await tester.pumpWidget(_app(now: () => now, onFetch: () => fetches++));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(fetches, 1);
 
     now = DateTime(2026, 8, 15, 8);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(fetches, 2);
     expect(find.text('SATURDAY, AUG 15'), findsOneWidget);
@@ -51,12 +53,14 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(fetches, 1);
 
     now = DateTime(2026, 8, 15);
     midnightCallback!();
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(fetches, 2);
   });

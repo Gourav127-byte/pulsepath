@@ -42,8 +42,10 @@ class VeyaActivityFact {
       recordingStatus: json['recording_status'] as String? ?? 'recorded',
       stepsProvenance: json['steps_provenance'] as String? ?? 'system',
       distanceProvenance: json['distance_provenance'] as String? ?? 'system',
-      activeCaloriesProvenance: json['active_calories_provenance'] as String? ?? 'system',
-      activeMinutesProvenance: json['active_minutes_provenance'] as String? ?? 'system',
+      activeCaloriesProvenance:
+          json['active_calories_provenance'] as String? ?? 'system',
+      activeMinutesProvenance:
+          json['active_minutes_provenance'] as String? ?? 'system',
     );
   }
 }
@@ -71,7 +73,8 @@ class VeyaIntegrityLens {
       confirmedDays: (json['confirmed_days'] as num?)?.toInt() ?? 0,
       legacyDays: (json['legacy_days'] as num?)?.toInt() ?? 0,
       missingDays: (json['missing_days'] as num?)?.toInt() ?? 0,
-      confirmedCoverage: (json['confirmed_coverage'] as num?)?.toDouble() ?? 0.0,
+      confirmedCoverage:
+          (json['confirmed_coverage'] as num?)?.toDouble() ?? 0.0,
       rationale: json['rationale'] as String? ?? '',
     );
   }
@@ -81,10 +84,7 @@ class VeyaEvidenceCitation {
   final String fact;
   final String? date;
 
-  const VeyaEvidenceCitation({
-    required this.fact,
-    this.date,
-  });
+  const VeyaEvidenceCitation({required this.fact, this.date});
 
   factory VeyaEvidenceCitation.fromJson(Map<String, dynamic> json) {
     return VeyaEvidenceCitation(
@@ -97,7 +97,8 @@ class VeyaEvidenceCitation {
 class VeyaObservation {
   final String text;
   final String confidence; // 'high' | 'medium' | 'low'
-  final String category; // 'consistency' | 'trend' | 'goal_progress' | 'routine_recovery'
+  final String
+  category; // 'consistency' | 'trend' | 'goal_progress' | 'routine_recovery'
   final List<VeyaEvidenceCitation> evidence;
 
   const VeyaObservation({
@@ -171,7 +172,9 @@ class VeyaEvidencePacket {
       activities: rawActs
           .map((a) => VeyaActivityFact.fromJson(a as Map<String, dynamic>))
           .toList(),
-      integrity: VeyaIntegrityLens.fromJson(json['integrity'] as Map<String, dynamic>? ?? {}),
+      integrity: VeyaIntegrityLens.fromJson(
+        json['integrity'] as Map<String, dynamic>? ?? {},
+      ),
     );
   }
 }
@@ -187,8 +190,12 @@ class VeyaFoundationResponse {
 
   factory VeyaFoundationResponse.fromJson(Map<String, dynamic> json) {
     return VeyaFoundationResponse(
-      evidence: VeyaEvidencePacket.fromJson(json['evidence'] as Map<String, dynamic>? ?? {}),
-      response: VeyaStructuredResponse.fromJson(json['response'] as Map<String, dynamic>? ?? {}),
+      evidence: VeyaEvidencePacket.fromJson(
+        json['evidence'] as Map<String, dynamic>? ?? {},
+      ),
+      response: VeyaStructuredResponse.fromJson(
+        json['response'] as Map<String, dynamic>? ?? {},
+      ),
     );
   }
 }

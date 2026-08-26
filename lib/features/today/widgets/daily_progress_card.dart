@@ -81,7 +81,7 @@ class _DayBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final score = entry?.dailyScore.clamp(0, 100).toDouble();
+    final score = entry?.dailyScore?.clamp(0, 100).toDouble();
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [

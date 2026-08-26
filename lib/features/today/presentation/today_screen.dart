@@ -24,11 +24,39 @@ import '../../veya/providers/veya_providers.dart';
 import '../../veya/widgets/veya_insights_card.dart';
 import '../../veya/widgets/veya_chat_sheet.dart';
 
-class TodayScreen extends ConsumerWidget {
+class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends ConsumerState<TodayScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(healthSyncControllerProvider.notifier).syncIfStale();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(healthSyncControllerProvider.notifier).syncIfStale();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final activity = ref.watch(todayActivityProvider);
     final profile = ref.watch(backendProfileProvider);
     final goals = ref.watch(backendGoalsProvider);
@@ -252,7 +280,7 @@ class _ActivityContent extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DailyScoreCard(
-          score: activity.dailyScore.round(),
+          score: activity.dailyScore?.round(),
           streakDays: engagement.asData?.value.currentStreak,
           onExplain: () => showModalBottomSheet<void>(
             context: context,
@@ -264,7 +292,9 @@ class _ActivityContent extends ConsumerWidget {
         const SizedBox(height: 14),
         _EngagementState(engagement: engagement, onRetry: onEngagementRetry),
         const SizedBox(height: 14),
-        ref.watch(veyaFoundationProvider(7)).when(
+        ref
+            .watch(veyaFoundationProvider(7))
+            .when(
               data: (veyaData) => VeyaInsightsCard(
                 response: veyaData.response,
                 onAskVeya: () => VeyaChatSheet.show(context),
@@ -485,7 +515,9 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: MetricCard(
                 label: ActivityMetricType.distance.shortLabel,
-                value: activity.distance.toStringAsFixed(1),
+                value: activity.distance != null
+                    ? activity.distance!.toStringAsFixed(1)
+                    : '--',
                 unit: ActivityMetricType.distance.unit,
                 goal: distanceGoal.label,
                 goalDetail: distanceGoal.detail,
@@ -502,7 +534,9 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: MetricCard(
                 label: ActivityMetricType.activeMinutes.shortLabel,
-                value: activity.activeMinutes.round().toString(),
+                value: activity.activeMinutes != null
+                    ? activity.activeMinutes!.round().toString()
+                    : '--',
                 unit: ActivityMetricType.activeMinutes.unit,
                 goal: activeGoal.label,
                 goalDetail: activeGoal.detail,
@@ -515,7 +549,9 @@ class _MetricsGrid extends StatelessWidget {
             Expanded(
               child: MetricCard(
                 label: ActivityMetricType.calories.shortLabel,
-                value: activity.calories.round().toString(),
+                value: activity.calories != null
+                    ? activity.calories!.round().toString()
+                    : '--',
                 unit: ActivityMetricType.calories.unit,
                 goal: caloriesGoal.label,
                 goalDetail: caloriesGoal.detail,
@@ -530,12 +566,13 @@ class _MetricsGrid extends StatelessWidget {
     );
   }
 
-  String _wholeNumber(double value) {
+  String _wholeNumber(double? value) {
+    if (value == null) return '--';
     final digits = value.round().toString();
     return digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
   }
 
-  _GoalStatus _goalStatus(ActivityMetricType type, double currentValue) {
+  _GoalStatus _goalStatus(ActivityMetricType type, double? currentValue) {
     return goals.when(
       data: (values) {
         BackendGoal? matchingGoal;
@@ -544,6 +581,19 @@ class _MetricsGrid extends StatelessWidget {
             matchingGoal = goal;
             break;
           }
+        }
+        if (currentValue == null) {
+          final targetStr = matchingGoal != null
+              ? (type == ActivityMetricType.distance
+                    ? matchingGoal.targetValue.toStringAsFixed(1)
+                    : _wholeNumber(matchingGoal.targetValue))
+              : '';
+          return _GoalStatus(
+            matchingGoal != null
+                ? 'Goal: $targetStr ${type.unit}'
+                : 'No goal set',
+            'Not recorded',
+          );
         }
         if (matchingGoal == null) return const _GoalStatus('No goal set');
         if (matchingGoal.targetValue <= 0) {
@@ -619,10 +669,6 @@ class _HealthSyncIndicator extends ConsumerWidget {
 
     final syncState = ref.watch(healthSyncControllerProvider);
     final notifier = ref.read(healthSyncControllerProvider.notifier);
-    if (syncState.status == HealthSyncStatus.error &&
-        (syncState.message?.contains('not available') ?? false)) {
-      return const SizedBox.shrink();
-    }
 
     String label;
     IconData icon;
@@ -655,8 +701,8 @@ class _HealthSyncIndicator extends ConsumerWidget {
         color = PulsePathColors.cyan;
         break;
       case HealthSyncStatus.idle:
-        if (syncState.lastSync != null) {
-          final time = _formatTime(syncState.lastSync!);
+        if (syncState.lastSuccessfulSync != null) {
+          final time = _formatTime(syncState.lastSuccessfulSync!);
           label = 'Synced $time';
           icon = Icons.cloud_done_outlined;
           color = PulsePathColors.textSecondary;
@@ -678,10 +724,8 @@ class _HealthSyncIndicator extends ConsumerWidget {
           onTap: syncState.status == HealthSyncStatus.syncing
               ? null
               : () async {
-                  if (syncState.status == HealthSyncStatus.unauthorized) {
-                    final granted = await notifier.requestPermissions();
-                    if (granted) await notifier.sync();
-                  } else {
+                  final granted = await notifier.requestPermissions();
+                  if (granted) {
                     await notifier.sync();
                   }
                 },

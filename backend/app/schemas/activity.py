@@ -1,5 +1,4 @@
-from datetime import date
-
+from datetime import date, datetime
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -9,6 +8,13 @@ ActivityMetric = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
 
 
 class ActivityUpdate(BaseModel):
+    """Partial activity update.
+
+    ``active_minutes`` accepts only a direct manual value or the total duration
+    of recorded Health Connect workout/exercise sessions. Passive movement and
+    steps/cadence/calorie heuristics are not valid Active Minutes sources.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     steps: ActivityMetric | None = None
@@ -22,7 +28,7 @@ class ActivityUpdate(BaseModel):
 
     @field_validator("steps", "active_minutes", "calories", "distance")
     @classmethod
-    def supplied_metrics_cannot_be_null(cls, value: float | None) -> float:
+    def supplied_metrics_cannot_be_null(cls, value: float | None) -> float | None:
         if value is None:
             raise ValueError("activity metrics cannot be null")
         return value
@@ -40,11 +46,11 @@ class ActivityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     date: date
-    steps: float
-    active_minutes: float
-    distance: float
-    calories: float
-    daily_score: float
+    steps: float | None = None
+    active_minutes: float | None = None
+    distance: float | None = None
+    calories: float | None = None
+    daily_score: float | None = None
     score_version: str
     source: str
     recording_status: str
@@ -81,15 +87,16 @@ class ActivityEngagementResponse(BaseModel):
 
 class ScoreComponentResponse(BaseModel):
     metric: str
-    value: float
-    target: float | None
-    progress: float
+    value: float | None = None
+    target: float | None = None
+    progress: float | None = None
     weight: float
-    points: float
+    points: float | None = None
+    status: str = "recorded"
 
 
 class DailyScoreExplanationResponse(BaseModel):
-    score: float
+    score: float | None = None
     score_version: str
     available: bool
     message: str | None = None
@@ -98,8 +105,8 @@ class DailyScoreExplanationResponse(BaseModel):
 
 class StrongestDayResponse(BaseModel):
     date: date
-    daily_score: float
-    steps: float
+    daily_score: float | None = None
+    steps: float | None = None
 
 
 class ActivityInsightsResponse(BaseModel):
@@ -121,3 +128,23 @@ class ActivityInsightsResponse(BaseModel):
     consistency_days: int
     strongest_steps_day: StrongestDayResponse | None
     strongest_score_day: StrongestDayResponse | None
+
+
+class StepSampleDTO(BaseModel):
+    sample_id: str | None = None
+    start_time: datetime
+    end_time: datetime
+    steps: int = Field(ge=0)
+    source_origin: str = "health_connect"
+
+
+class ActivityTimelineSyncRequest(BaseModel):
+    date: date
+    samples: list[StepSampleDTO]
+
+
+class ActivityTimelineResponse(BaseModel):
+    date: date
+    total_steps: int
+    samples_count: int
+    timeline: list[StepSampleDTO]

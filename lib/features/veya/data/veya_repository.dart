@@ -15,13 +15,10 @@ class VeyaRepository {
     required String message,
     int rangeDays = 7,
   }) async {
-    final response = await _apiClient.postJson(
-      '/veya/chat',
-      {
-        'message': message,
-        'range_days': rangeDays,
-      },
-    );
+    final response = await _apiClient.postJson('/veya/chat', {
+      'message': message,
+      'range_days': rangeDays,
+    });
     return response;
   }
 }

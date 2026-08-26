@@ -1,0 +1,246 @@
+﻿import 'package:flutter/material.dart';
+
+import '../../../core/activity/activity_metric.dart';
+import '../../../core/theme/pulse_path_theme.dart';
+import '../models/backend_goal.dart';
+
+class GoalFormSheet extends StatefulWidget {
+  const GoalFormSheet.edit({
+    required this.goal,
+    required Future<void> Function(double targetValue) onSave,
+    super.key,
+  }) : availableTypes = const [],
+       onEdit = onSave,
+       onCreate = null;
+
+  const GoalFormSheet.create({
+    required this.availableTypes,
+    required Future<void> Function(ActivityMetricType type, double targetValue)
+    onSave,
+    super.key,
+  }) : goal = null,
+       onEdit = null,
+       onCreate = onSave;
+
+  final BackendGoal? goal;
+  final List<ActivityMetricType> availableTypes;
+  final Future<void> Function(double targetValue)? onEdit;
+  final Future<void> Function(ActivityMetricType type, double targetValue)?
+  onCreate;
+
+  @override
+  State<GoalFormSheet> createState() => _GoalFormSheetState();
+}
+
+class _GoalFormSheetState extends State<GoalFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _targetController;
+  ActivityMetricType? _selectedType;
+  bool _isSaving = false;
+  String? _saveError;
+
+  @override
+  void initState() {
+    super.initState();
+    _targetController = TextEditingController(
+      text: widget.goal == null ? '' : _format(widget.goal!.targetValue),
+    );
+    _selectedType = widget.availableTypes.firstOrNull;
+  }
+
+  @override
+  void dispose() {
+    _targetController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 12,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: PulsePathColors.divider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  widget.goal == null ? 'Create daily goal' : 'Edit daily goal',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.goal == null
+                      ? 'Choose an activity and set its daily target.'
+                      : 'Update the target while keeping the activity type.',
+                  style: TextStyle(color: PulsePathColors.textSecondary),
+                ),
+                const SizedBox(height: 22),
+                if (widget.goal case final goal?)
+                  _LockedGoalType(type: goal.type)
+                else
+                  DropdownButtonFormField<ActivityMetricType>(
+                    key: const Key('goal_type_dropdown'),
+                    initialValue: _selectedType,
+                    decoration: const InputDecoration(labelText: 'Goal type'),
+                    items: [
+                      for (final type in widget.availableTypes)
+                        DropdownMenuItem(value: type, child: Text(type.label)),
+                    ],
+                    onChanged: _isSaving
+                        ? null
+                        : (value) => setState(() => _selectedType = value),
+                    validator: (value) =>
+                        value == null ? 'Choose a goal type' : null,
+                  ),
+                const SizedBox(height: 14),
+                if (widget.goal == null) ...[
+                  Text('Target', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                ],
+                TextFormField(
+                  key: const Key('target_value_field'),
+                  controller: _targetController,
+                  enabled: !_isSaving,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: widget.goal == null ? 'Target' : 'Target value',
+                    hintText: 'Enter a value greater than zero',
+                    suffixText: (widget.goal?.type ?? _selectedType)?.unit,
+                  ),
+                  validator: _validateTarget,
+                  onFieldSubmitted: (_) => _submit(),
+                ),
+                if (_saveError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _saveError!,
+                    key: const Key('goal_save_error'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                FilledButton(
+                  key: const Key('save_goal_button'),
+                  onPressed: _isSaving ? null : _submit,
+                  child: _isSaving
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          widget.goal == null ? 'Create goal' : 'Save target',
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateTarget(String? rawValue) {
+    final value = rawValue?.trim() ?? '';
+    if (value.isEmpty) return 'Target is required';
+
+    final parsedValue = double.tryParse(value);
+    if (parsedValue == null || !parsedValue.isFinite) {
+      return 'Enter a valid number';
+    }
+    if (parsedValue <= 0) return 'Target must be greater than zero';
+    return null;
+  }
+
+  Future<void> _submit() async {
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+      _saveError = null;
+    });
+    try {
+      final parsedUserInputTarget = double.parse(_targetController.text.trim());
+      if (widget.goal == null) {
+        await widget.onCreate!(_selectedType!, parsedUserInputTarget);
+      } else {
+        await widget.onEdit!(parsedUserInputTarget);
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _saveError = 'Could not save this goal. Please try again.';
+      });
+    }
+  }
+
+  static String _format(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
+  }
+}
+
+class _LockedGoalType extends StatelessWidget {
+  const _LockedGoalType({required this.type});
+
+  final ActivityMetricType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '${type.label} goal type, locked while editing',
+      child: Container(
+        key: const Key('locked_goal_type'),
+        constraints: const BoxConstraints(
+          minHeight: PulsePathSizes.controlHeight,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: PulsePathColors.surface,
+          borderRadius: BorderRadius.circular(PulsePathSizes.controlRadius),
+          border: Border.all(color: PulsePathColors.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(type.icon, size: 20, color: type.accent),
+            const SizedBox(width: 10),
+            Expanded(child: Text(type.label)),
+            const Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: PulsePathColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

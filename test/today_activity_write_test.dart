@@ -530,6 +530,9 @@ Future<void> _pumpToday(WidgetTester tester, http.Client client) async {
         apiClientProvider.overrideWithValue(
           ApiClient(baseUrl: 'http://example.test', client: client),
         ),
+        healthConnectServiceProvider.overrideWithValue(
+          _PermissionDeniedHealthService(),
+        ),
       ],
       child: MaterialApp(
         theme: PulsePathTheme.dark,
@@ -541,8 +544,31 @@ Future<void> _pumpToday(WidgetTester tester, http.Client client) async {
 }
 
 Future<void> _openSheetAndEnterSteps(WidgetTester tester, String steps) async {
-  await tester.tap(find.byKey(const Key('edit_activity_button')));
-  await tester.pumpAndSettle();
+  final stepsField = find.byKey(const Key('activity_steps_field'));
+  if (stepsField.evaluate().isEmpty) {
+    final editButton = find.byKey(const Key('edit_activity_button'));
+    final quickLogButton = find.byKey(const Key('quick_log_activity_button'));
+    if (editButton.evaluate().isNotEmpty) {
+      if (tester.any(find.byType(CustomScrollView))) {
+        await tester.drag(
+          find.byType(CustomScrollView).first,
+          const Offset(0, -300),
+        );
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(editButton);
+    } else if (quickLogButton.evaluate().isNotEmpty) {
+      if (tester.any(find.byType(CustomScrollView))) {
+        await tester.drag(
+          find.byType(CustomScrollView).first,
+          const Offset(0, -300),
+        );
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(quickLogButton);
+    }
+    await tester.pumpAndSettle();
+  }
   await tester.enterText(find.byKey(const Key('activity_steps_field')), steps);
 }
 

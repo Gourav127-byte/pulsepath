@@ -61,6 +61,7 @@ class AuthController extends StateNotifier<AuthState> {
   );
 
   Future<bool> _authenticate(Future<AuthSession> Function() action) async {
+    if (state.status == AuthStatus.loading) return false;
     state = const AuthState(AuthStatus.loading);
     try {
       final session = await action();
@@ -73,6 +74,10 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   void clearError() => state = const AuthState.unauthenticated();
+
+  void setSession(AuthSession session) {
+    state = AuthState(AuthStatus.authenticated, user: session.user);
+  }
 
   Future<void> logout() async {
     await _repository!.logout();

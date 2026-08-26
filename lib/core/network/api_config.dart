@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 abstract final class ApiConfig {
-  static const _developmentFallbackUrl = 'http://192.168.29.78:8000';
+  static const _developmentFallbackUrl = 'http://127.0.0.1:8000';
   static const _configuredUrl = String.fromEnvironment(
     'PULSEPATH_API_BASE_URL',
   );
@@ -9,6 +9,14 @@ abstract final class ApiConfig {
   static const baseUrl = _configuredUrl == ''
       ? _developmentFallbackUrl
       : _configuredUrl;
+
+  static const _configuredGoogleClientId = String.fromEnvironment(
+    'PULSEPATH_GOOGLE_CLIENT_ID',
+  );
+
+  static const googleClientId = _configuredGoogleClientId == ''
+      ? '203075262869-97sdh39dl408s9omi6m1q2co5t6s1nvt.apps.googleusercontent.com'
+      : _configuredGoogleClientId;
 
   static bool get hasConfiguredUrl => _configuredUrl.isNotEmpty;
 
