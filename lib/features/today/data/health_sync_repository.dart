@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../services/health_connect_service.dart';
 import 'today_activity_repository.dart';
 
@@ -15,10 +17,17 @@ class HealthSyncRepository {
     }
 
     final data = await _healthService.fetchDailyData();
-    print(
-      '[VALIDATION_GATE][CHECKPOINT_4] HealthSyncRepository sync fetched: '
-      'steps=${data.steps}, distance=${data.distance}, calories=${data.calories}, timelineSamples=${data.timelineSamples.length}',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[HEALTH_SYNC] stage=read_complete hasData=${!data.isEmpty} '
+        'granularity=${data.granularity.name} '
+        'steps=${data.capabilities.hasSteps} '
+        'intervals=${data.capabilities.hasTimestampedStepIntervals} '
+        'distance=${data.capabilities.hasDistance} '
+        'calories=${data.capabilities.hasActiveCalories} '
+        'workouts=${data.capabilities.hasWorkoutSessions}',
+      );
+    }
     if (data.isEmpty) return HealthSyncOutcome.noData;
 
     if (data.timelineSamples.isNotEmpty) {
@@ -27,8 +36,13 @@ class HealthSyncRepository {
           date: DateTime.now(),
           samples: data.timelineSamples,
         );
-      } catch (e) {
-        print('[TIMELINE_ERROR] syncTimelineSamples failed: $e');
+      } on Object catch (error) {
+        if (kDebugMode) {
+          debugPrint(
+            '[HEALTH_SYNC] stage=timeline_upload_failed '
+            'type=${error.runtimeType}',
+          );
+        }
       }
     }
 

@@ -17,12 +17,34 @@ class StepSampleRecord {
   final String? sampleId;
 
   Map<String, Object?> toJson() => {
-        if (sampleId != null) 'sample_id': sampleId,
-        'start_time': startTime.toUtc().toIso8601String(),
-        'end_time': endTime.toUtc().toIso8601String(),
-        'steps': steps,
-        'source_origin': sourceOrigin,
-      };
+    if (sampleId != null) 'sample_id': sampleId,
+    'start_time': startTime.toUtc().toIso8601String(),
+    'end_time': endTime.toUtc().toIso8601String(),
+    'steps': steps,
+    'source_origin': sourceOrigin,
+  };
+}
+
+enum TimelineGranularity {
+  timestampedIntervals,
+  coarseDailyAggregate,
+  none,
+}
+
+class SourceCapabilities {
+  const SourceCapabilities({
+    required this.hasSteps,
+    required this.hasTimestampedStepIntervals,
+    required this.hasDistance,
+    required this.hasActiveCalories,
+    required this.hasWorkoutSessions,
+  });
+
+  final bool hasSteps;
+  final bool hasTimestampedStepIntervals;
+  final bool hasDistance;
+  final bool hasActiveCalories;
+  final bool hasWorkoutSessions;
 }
 
 class HealthSyncResult {
@@ -32,6 +54,14 @@ class HealthSyncResult {
     this.calories,
     this.activeMinutes,
     this.timelineSamples = const [],
+    this.granularity = TimelineGranularity.none,
+    this.capabilities = const SourceCapabilities(
+      hasSteps: false,
+      hasTimestampedStepIntervals: false,
+      hasDistance: false,
+      hasActiveCalories: false,
+      hasWorkoutSessions: false,
+    ),
   });
 
   final double? steps;
@@ -39,6 +69,8 @@ class HealthSyncResult {
   final double? calories;
   final double? activeMinutes;
   final List<StepSampleRecord> timelineSamples;
+  final TimelineGranularity granularity;
+  final SourceCapabilities capabilities;
 
   bool get isEmpty =>
       steps == null &&
@@ -246,7 +278,9 @@ class AndroidHealthConnectService implements HealthConnectService {
                 startTime: point.dateFrom,
                 endTime: point.dateTo,
                 steps: count,
-                sourceOrigin: point.sourceId.isNotEmpty ? point.sourceId : 'health_connect',
+                sourceOrigin: point.sourceId.isNotEmpty
+                    ? point.sourceId
+                    : 'health_connect',
                 sampleId: point.uuid.isNotEmpty ? point.uuid : null,
               ),
             );
@@ -270,54 +304,49 @@ class AndroidHealthConnectService implements HealthConnectService {
     }
 
     if (timelineSamples.isEmpty && rawSteps != null && rawSteps > 0) {
-      print('[TIMELINE_DEBUG] rawSteps=$rawSteps > 0. Attempting 15-min duration aggregation...');
-      try {
-        var current = startOfDay;
-        while (current.isBefore(now)) {
-          final next = current.add(const Duration(minutes: 15));
-          final windowEnd = next.isBefore(now) ? next : now;
-          final windowSteps = await _health.getTotalStepsInInterval(current, windowEnd);
-          if (windowSteps != null && windowSteps > 0) {
-            final sampleId = 'hc_agg_${current.millisecondsSinceEpoch}_${windowEnd.millisecondsSinceEpoch}';
-            timelineSamples.add(
-              StepSampleRecord(
-                startTime: current,
-                endTime: windowEnd,
-                steps: windowSteps,
-                sourceOrigin: 'health_connect_aggregate',
-                sampleId: sampleId,
-              ),
-            );
-          }
-          current = next;
-        }
-      } catch (e) {
-        print('[TIMELINE_DEBUG] 15-min bucket query error: $e');
-      }
-
-      if (timelineSamples.isEmpty) {
-        print('[TIMELINE_DEBUG] 15-min buckets empty. Adding active duration window bucket...');
-        final sampleId = 'hc_agg_${startOfDay.millisecondsSinceEpoch}_${now.millisecondsSinceEpoch}';
-        timelineSamples.add(
-          StepSampleRecord(
-            startTime: startOfDay,
-            endTime: now,
-            steps: rawSteps,
-            sourceOrigin: 'health_connect_aggregate',
-            sampleId: sampleId,
-          ),
-        );
-      }
-      print('[TIMELINE_DEBUG] Total timelineSamples generated: ${timelineSamples.length}');
+      // Some devices expose only the authoritative daily aggregate. Do not
+      // issue dozens of sequential 15-minute plugin queries on the foreground
+      // sync path: they delay the primary Today update and are not guaranteed
+      // to expose finer-grained records. Preserve the real aggregate as one
+      // explicitly attributed sample instead.
+      timelineSamples.add(
+        StepSampleRecord(
+          startTime: startOfDay,
+          endTime: now,
+          steps: rawSteps,
+          sourceOrigin: 'health_connect_aggregate',
+          sampleId:
+              'hc_agg_${startOfDay.millisecondsSinceEpoch}_${now.millisecondsSinceEpoch}',
+        ),
+      );
     }
 
+    final granularity = hasStepRecords
+        ? TimelineGranularity.timestampedIntervals
+        : (timelineSamples.isNotEmpty
+            ? TimelineGranularity.coarseDailyAggregate
+            : TimelineGranularity.none);
+
+    final capabilities = SourceCapabilities(
+      hasSteps: (hasStepRecords || (rawSteps != null && rawSteps > 0)),
+      hasTimestampedStepIntervals: hasStepRecords,
+      hasDistance: distance != null,
+      hasActiveCalories: calories != null,
+      hasWorkoutSessions: activeMinutes != null,
+    );
+
     final result = HealthSyncResult(
-      steps: (hasStepRecords || timelineSamples.isNotEmpty) ? (rawSteps?.toDouble() ?? 0.0) : null,
-      // Convert distance from meters to km. Calories are active energy only.
-      distance: distance != null ? distance / 1000 : null,
+      steps: (hasStepRecords || timelineSamples.isNotEmpty)
+          ? (rawSteps?.toDouble() ?? 0.0)
+          : null,
+      // Distance and active calories remain absent unless Health Connect has
+      // actual records. Active Minutes come only from workout duration.
+      distance: distance != null ? distance / 1000.0 : null,
       calories: calories,
       activeMinutes: activeMinutes,
       timelineSamples: timelineSamples,
+      granularity: granularity,
+      capabilities: capabilities,
     );
     return result;
   }
