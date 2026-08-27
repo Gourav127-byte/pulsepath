@@ -128,7 +128,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Text(
                     'OR',
                     style: TextStyle(
-                      color: PulsePathColors.textSecondary.withValues(alpha: 0.7),
+                      color: PulsePathColors.textSecondary.withValues(
+                        alpha: 0.7,
+                      ),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -172,18 +174,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _googleSignIn() async {
     try {
-      final session = await ref.read(authRepositoryProvider).signInWithGoogleNative();
+      final session = await ref
+          .read(authRepositoryProvider)
+          .signInWithGoogleNative();
       ref.read(authControllerProvider.notifier).setSession(session);
     } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+      if (mounted && !e.message.contains('cancelled')) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Google Sign-In cancelled or failed.')),
+          SnackBar(content: Text('Google Sign-In failed: $e')),
         );
       }
     }
@@ -287,6 +291,33 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ? const _ButtonProgress()
                   : const Text('Create account'),
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'OR',
+                    style: TextStyle(
+                      color: PulsePathColors.textSecondary.withValues(
+                        alpha: 0.7,
+                      ),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: const Key('google_signup_button'),
+              onPressed: loading ? null : _googleSignUp,
+              icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+              label: const Text('Sign up with Google'),
+            ),
             const SizedBox(height: 16),
             _AuthLink(
               prompt: 'Already have an account?',
@@ -297,6 +328,27 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _googleSignUp() async {
+    try {
+      final session = await ref
+          .read(authRepositoryProvider)
+          .signInWithGoogleNative();
+      ref.read(authControllerProvider.notifier).setSession(session);
+    } on AuthException catch (e) {
+      if (mounted && !e.message.contains('cancelled')) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-Up failed: $e')),
+        );
+      }
+    }
   }
 }
 

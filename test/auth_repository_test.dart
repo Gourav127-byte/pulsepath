@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -187,6 +188,54 @@ void main() {
     );
     await repository.logout();
     expect(storage.token, isNull);
+  });
+
+  test(
+    'logout does not wait for remote revocation before clearing tokens',
+    () async {
+      final response = Completer<http.Response>();
+      final storage = MemoryTokenStorage()
+        ..token = 'stored-token'
+        ..refreshToken = 'stored-refresh-token';
+      final repository = AuthRepository(
+        ApiClient(
+          baseUrl: 'http://test/',
+          client: MockClient((request) {
+            expect(request.url.path, '/auth/logout');
+            return response.future;
+          }),
+        ),
+        storage,
+      );
+
+      await repository.logout().timeout(const Duration(seconds: 1));
+
+      expect(storage.token, isNull);
+      expect(storage.refreshToken, isNull);
+      response.complete(http.Response('{}', 200));
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+
+  test('loginWithGoogle sends id_token to /auth/google and persists session', () async {
+    final storage = MemoryTokenStorage();
+    final repository = AuthRepository(
+      ApiClient(
+        baseUrl: 'http://test/',
+        client: MockClient((request) async {
+          expect(request.url.path, '/auth/google');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['id_token'], 'valid_google_id_token');
+          return http.Response(jsonEncode(_authResponse), 200);
+        }),
+      ),
+      storage,
+    );
+
+    final session = await repository.loginWithGoogle('valid_google_id_token');
+    expect(session.user.email, 'alex@example.com');
+    expect(storage.token, 'jwt-token');
+    expect(storage.refreshToken, 'refresh-token');
   });
 }
 
