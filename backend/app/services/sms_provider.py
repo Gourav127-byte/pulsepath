@@ -81,9 +81,12 @@ class ProductionSMSProvider(SMSProvider):
 
 
 def get_sms_provider() -> SMSProvider:
-    env = getattr(settings, "app_env", "development").lower()
     provider_name = getattr(settings, "sms_provider", "mock").lower()
-
-    if env == "production" or provider_name != "mock":
-        return ProductionSMSProvider()
+    api_key = getattr(settings, "sms_api_key", None)
+    if provider_name != "mock" and api_key:
+        try:
+            return ProductionSMSProvider()
+        except RuntimeError:
+            logger.warning("ProductionSMSProvider failed to initialize. Falling back to MockSMSProvider.")
+            return MockSMSProvider()
     return MockSMSProvider()

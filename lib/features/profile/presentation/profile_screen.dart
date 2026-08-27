@@ -57,6 +57,8 @@ class ProfileScreen extends ConsumerWidget {
                       ref.invalidate(backendProfileProvider);
                       ref.invalidate(backendGoalsProvider);
                     },
+                    onLogout: () =>
+                        ref.read(authControllerProvider.notifier).logout(),
                   ),
                   _ => const Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
@@ -524,9 +526,10 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _ProfileError extends StatelessWidget {
-  const _ProfileError({required this.onRetry});
+  const _ProfileError({required this.onRetry, required this.onLogout});
 
   final VoidCallback onRetry;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -541,7 +544,18 @@ class _ProfileError extends StatelessWidget {
         children: [
           const Text('Could not load profile.'),
           const SizedBox(height: 12),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(onPressed: onRetry, child: const Text('Retry')),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Logout'),
+              ),
+            ],
+          ),
         ],
       ),
     );
