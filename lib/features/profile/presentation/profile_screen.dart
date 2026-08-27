@@ -36,23 +36,19 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
             sliver: SliverList.list(
               children: [
-                switch ((profile, goals)) {
-                  (
-                    AsyncData(value: final profile),
-                    AsyncData(value: final goals),
-                  ) =>
-                    _ProfileContent(
-                      profile: profile,
-                      goals: goals,
-                      preferenceWrites: preferenceWrites,
-                      preferenceError: preferenceError,
-                      onEditProfile: () => _editProfile(context, ref, profile),
-                      onPreferenceChanged: (field, value) =>
-                          _updatePreference(ref, field, value),
-                      onLogout: () =>
-                          ref.read(authControllerProvider.notifier).logout(),
-                    ),
-                  (AsyncError(), _) || (_, AsyncError()) => _ProfileError(
+                switch (profile) {
+                  AsyncData(value: final profileData) => _ProfileContent(
+                    profile: profileData,
+                    goals: goals.asData?.value ?? const [],
+                    preferenceWrites: preferenceWrites,
+                    preferenceError: preferenceError,
+                    onEditProfile: () => _editProfile(context, ref, profileData),
+                    onPreferenceChanged: (field, value) =>
+                        _updatePreference(ref, field, value),
+                    onLogout: () =>
+                        ref.read(authControllerProvider.notifier).logout(),
+                  ),
+                  AsyncError() => _ProfileError(
                     onRetry: () {
                       ref.invalidate(backendProfileProvider);
                       ref.invalidate(backendGoalsProvider);
