@@ -7,6 +7,8 @@ import '../../../core/theme/pulse_path_theme.dart';
 import '../models/activity_history_entry.dart';
 import '../models/activity_insights.dart';
 import '../providers/activity_history_provider.dart';
+import '../widgets/real_activity_snapshot_card.dart';
+import '../widgets/real_metric_progression_card.dart';
 
 class JourneyScreen extends ConsumerStatefulWidget {
   const JourneyScreen({super.key});
@@ -110,6 +112,18 @@ class _JourneyScreenState extends ConsumerState<JourneyScreen> {
                       ],
                     ),
                   ),
+          ),
+          const SizedBox(height: 22),
+          RealActivitySnapshotCard(
+            entry: _selected ??
+                (history.asData?.value.isNotEmpty == true
+                    ? history.asData!.value.first
+                    : null),
+          ),
+          const SizedBox(height: 22),
+          RealMetricProgressionCard(
+            entries: history.asData?.value ?? const [],
+            days: _days,
           ),
           const SizedBox(height: 22),
           Text(
