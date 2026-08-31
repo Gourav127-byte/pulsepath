@@ -59,6 +59,17 @@ class TemporaryDemoCache {
     }
   }
 
+  Future<void> clearAll() async {
+    final preferences = await SharedPreferences.getInstance();
+    await Future.wait([
+      preferences.remove(_scoped(_todayKey)),
+      preferences.remove(_scoped(_goalsKey)),
+      preferences.remove(_scoped(_profileKey)),
+      preferences.remove(_scoped('$_historyKey:7')),
+      preferences.remove(_scoped('$_historyKey:30')),
+    ]);
+  }
+
   Future<void> _save(String key, Object json) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_scoped(key), jsonEncode(json));

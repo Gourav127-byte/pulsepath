@@ -44,12 +44,16 @@ class RealActivitySnapshotCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Real Activity Snapshot',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+              Flexible(
+                child: Text(
+                  'Real Activity Snapshot',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -77,37 +81,46 @@ class RealActivitySnapshotCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 2.3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
+          Row(
             children: [
-              _MetricTile(
-                label: 'Steps',
-                value: stepsStr,
-                icon: Icons.directions_walk,
-                color: PulsePathColors.violet,
+              Expanded(
+                child: _MetricTile(
+                  label: 'Steps',
+                  value: stepsStr,
+                  icon: Icons.directions_walk,
+                  color: PulsePathColors.violet,
+                ),
               ),
-              _MetricTile(
-                label: 'Distance',
-                value: distStr,
-                icon: Icons.place_outlined,
-                color: PulsePathColors.cyan,
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MetricTile(
+                  label: 'Distance',
+                  value: distStr,
+                  icon: Icons.place_outlined,
+                  color: PulsePathColors.cyan,
+                ),
               ),
-              _MetricTile(
-                label: 'Active Time',
-                value: timeStr,
-                icon: Icons.timer_outlined,
-                color: PulsePathColors.blue,
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  label: 'Active Time',
+                  value: timeStr,
+                  icon: Icons.timer_outlined,
+                  color: PulsePathColors.blue,
+                ),
               ),
-              _MetricTile(
-                label: 'Active Calories',
-                value: calStr,
-                icon: Icons.local_fire_department_outlined,
-                color: Colors.orangeAccent,
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MetricTile(
+                  label: 'Active Calories',
+                  value: calStr,
+                  icon: Icons.local_fire_department_outlined,
+                  color: Colors.orangeAccent,
+                ),
               ),
             ],
           ),
@@ -155,11 +168,15 @@ class _MetricTile extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: PulsePathColors.textSecondary,
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: PulsePathColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],

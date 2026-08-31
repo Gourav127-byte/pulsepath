@@ -2,12 +2,13 @@ import 'package:flutter/foundation.dart';
 
 abstract final class ApiConfig {
   static const _developmentFallbackUrl = 'http://127.0.0.1:8000';
+  static const _productionBackendUrl = 'https://pulsepath-2-yg33.onrender.com';
   static const _configuredUrl = String.fromEnvironment(
     'PULSEPATH_API_BASE_URL',
   );
 
   static const baseUrl = _configuredUrl == ''
-      ? _developmentFallbackUrl
+      ? _productionBackendUrl
       : _configuredUrl;
 
   static const _configuredGoogleClientId = String.fromEnvironment(

@@ -60,18 +60,25 @@ class MetricCard extends StatelessWidget {
                       ),
                     ),
                     if (provenance == 'health_connect' ||
+                        provenance == 'health_connect_recorded' ||
+                        provenance == 'pulsepath_gps_recorded' ||
                         provenance == 'manual' ||
+                        provenance == 'step_estimated' ||
                         provenance == 'blended') ...[
                       const SizedBox(width: 6),
                       Container(
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: provenance == 'health_connect'
+                          color: (provenance == 'health_connect' ||
+                                  provenance == 'health_connect_recorded')
                               ? Colors.teal
-                              : (provenance == 'manual'
-                                    ? PulsePathColors.cyan
-                                    : PulsePathColors.violet),
+                              : (provenance == 'pulsepath_gps_recorded' ||
+                                      provenance == 'manual'
+                                  ? PulsePathColors.cyan
+                                  : (provenance == 'step_estimated'
+                                      ? Colors.orangeAccent
+                                      : PulsePathColors.violet)),
                           shape: BoxShape.circle,
                         ),
                       ),

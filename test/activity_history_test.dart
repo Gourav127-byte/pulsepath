@@ -107,7 +107,10 @@ void main() {
     final chartRect = tester.getRect(find.byKey(const Key('history_chart')));
     await tester.tapAt(Offset(chartRect.right - 4, chartRect.center.dy));
     await tester.pump();
-    expect(find.textContaining('12450 steps'), findsOneWidget);
+    final selection = tester.widget<Text>(
+      find.byKey(const Key('history_selection')),
+    );
+    expect(selection.data, contains('12450 steps'));
 
     await tester.tap(find.byKey(const Key('history_metric_distance')));
     await tester.pump();
@@ -279,11 +282,14 @@ void main() {
     final rect = tester.getRect(find.byKey(const Key('history_chart')));
     final slot = rect.width / 7;
     await tester.tapAt(Offset(rect.left + slot * 5.5, rect.center.dy));
-    await tester.pump();
-    expect(find.textContaining('0 steps'), findsOneWidget);
+    await tester.pumpAndSettle();
+    final selection0 = tester.widget<Text>(
+      find.byKey(const Key('history_selection')),
+    );
+    expect(selection0.data, contains('0 steps'));
 
     await tester.tapAt(Offset(rect.left + slot * 6.5, rect.center.dy));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final selection = tester.widget<Text>(
       find.byKey(const Key('history_selection')),
     );

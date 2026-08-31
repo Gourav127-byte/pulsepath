@@ -16,6 +16,13 @@ class StepSampleRecord {
   final String sourceOrigin;
   final String? sampleId;
 
+  Duration get duration => endTime.difference(startTime);
+
+  /// Distinguishes step-count trust (the count of steps is verified recorded evidence)
+  /// from timeline-precision trust (intervals under 1s represent instantaneous/point observations
+  /// or sync timestamps rather than extended walking interval durations).
+  bool get hasCoarseOrSubSecondTiming => duration.inSeconds < 1;
+
   Map<String, Object?> toJson() => {
     if (sampleId != null) 'sample_id': sampleId,
     'start_time': startTime.toUtc().toIso8601String(),

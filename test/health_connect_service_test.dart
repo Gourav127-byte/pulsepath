@@ -108,34 +108,60 @@ void main() {
         final result = await service.fetchDailyData();
 
         expect(result.steps, 10000);
+        expect(result.distance, isNull);
+        expect(result.calories, isNull);
         expect(result.activeMinutes, isNull);
       },
     );
 
-    test('active minutes sum recorded workout session durations only', () async {
-      final now = DateTime.now();
-      final client = _FakeHealthConnectClient()
-        ..points = [
-          _point(
-            HealthDataType.WORKOUT,
-            1,
-            now.subtract(const Duration(minutes: 20)),
-            now,
-          ),
-          _point(
-            HealthDataType.WORKOUT,
-            1,
-            now.subtract(const Duration(minutes: 55)),
-            now.subtract(const Duration(minutes: 30)),
-          ),
-        ];
-      final service = AndroidHealthConnectService.withClient(client);
+    test(
+      'active minutes sum recorded workout session durations only',
+      () async {
+        final now = DateTime.now();
+        final client = _FakeHealthConnectClient()
+          ..points = [
+            _point(
+              HealthDataType.WORKOUT,
+              1,
+              now.subtract(const Duration(minutes: 20)),
+              now,
+            ),
+            _point(
+              HealthDataType.WORKOUT,
+              1,
+              now.subtract(const Duration(minutes: 55)),
+              now.subtract(const Duration(minutes: 30)),
+            ),
+          ];
+        final service = AndroidHealthConnectService.withClient(client);
 
-      final result = await service.fetchDailyData();
+        final result = await service.fetchDailyData();
 
-      expect(result.activeMinutes, 45);
-      expect(result.steps, isNull);
-    });
+        expect(result.activeMinutes, 45);
+        expect(result.steps, isNull);
+      },
+    );
+
+    test(
+      'aggregate-only steps use one query and one attributed timeline sample',
+      () async {
+        final client = _FakeHealthConnectClient()..totalSteps = 1725;
+        final service = AndroidHealthConnectService.withClient(client);
+
+        final result = await service.fetchDailyData();
+
+        expect(client.totalStepQueries, 1);
+        expect(result.steps, 1725);
+        expect(result.timelineSamples, hasLength(1));
+        expect(
+          result.timelineSamples.single.sourceOrigin,
+          'health_connect_aggregate',
+        );
+        expect(result.distance, isNull);
+        expect(result.calories, isNull);
+        expect(result.activeMinutes, isNull);
+      },
+    );
   });
 }
 
@@ -172,6 +198,7 @@ class _FakeHealthConnectClient implements HealthConnectClient {
   List<HealthDataAccess> requestedPermissions = [];
   DateTime? readStart;
   DateTime? readEnd;
+  int totalStepQueries = 0;
 
   @override
   Future<bool> isHealthConnectAvailable() async =>
@@ -205,7 +232,10 @@ class _FakeHealthConnectClient implements HealthConnectClient {
   Future<int?> getTotalStepsInInterval(
     DateTime startTime,
     DateTime endTime,
-  ) async => totalSteps;
+  ) async {
+    totalStepQueries++;
+    return totalSteps;
+  }
 
   @override
   Future<List<HealthDataPoint>> getHealthDataFromTypes({

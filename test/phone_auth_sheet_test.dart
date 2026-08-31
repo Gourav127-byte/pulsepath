@@ -10,9 +10,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(body: PhoneAuthSheet()),
-        ),
+        child: MaterialApp(home: Scaffold(body: PhoneAuthSheet())),
       ),
     );
 

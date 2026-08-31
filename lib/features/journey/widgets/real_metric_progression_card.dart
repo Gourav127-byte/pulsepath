@@ -4,8 +4,8 @@ import '../../../core/theme/pulse_path_theme.dart';
 import '../models/activity_history_entry.dart';
 
 enum RealProgressionMetric {
+  steps('Steps', 'steps', PulsePathColors.violet),
   distance('Distance', 'km', PulsePathColors.cyan),
-  activeMinutes('Active Time', 'mins', PulsePathColors.blue),
   activeCalories('Calories', 'kcal', Colors.orangeAccent);
 
   const RealProgressionMetric(this.label, this.unit, this.color);
@@ -14,8 +14,8 @@ enum RealProgressionMetric {
   final Color color;
 
   double? valueOf(ActivityHistoryEntry entry) => switch (this) {
+        steps => entry.steps,
         distance => entry.distance,
-        activeMinutes => entry.activeMinutes,
         activeCalories => entry.activeCalories,
       };
 }
@@ -35,7 +35,7 @@ class RealMetricProgressionCard extends StatefulWidget {
 }
 
 class _RealMetricProgressionCardState extends State<RealMetricProgressionCard> {
-  RealProgressionMetric _selectedMetric = RealProgressionMetric.distance;
+  RealProgressionMetric _selectedMetric = RealProgressionMetric.steps;
 
   @override
   Widget build(BuildContext context) {
@@ -62,12 +62,16 @@ class _RealMetricProgressionCardState extends State<RealMetricProgressionCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Real Metric Progression',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+              Flexible(
+                child: Text(
+                  'Real Metric Progression',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               const Text(
                 'Missing != Zero',
                 style: TextStyle(
@@ -112,37 +116,55 @@ class _RealMetricProgressionCardState extends State<RealMetricProgressionCard> {
                       style: TextStyle(color: PulsePathColors.textSecondary),
                     ),
                   )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (final entry in recordedEntries.reversed)
-                        Expanded(
-                          child: _BarColumn(
-                            entry: entry,
-                            metric: _selectedMetric,
-                            maxValue: maxValue,
-                          ),
-                        ),
-                    ],
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columnCount = recordedEntries.length;
+                      final columnWidth = columnCount > 0
+                          ? constraints.maxWidth / columnCount
+                          : constraints.maxWidth;
+                      final isCompact = columnWidth < 20;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (final entry in recordedEntries.reversed)
+                            Expanded(
+                              child: _BarColumn(
+                                entry: entry,
+                                metric: _selectedMetric,
+                                maxValue: maxValue,
+                                columnWidth: columnWidth,
+                                isCompact: isCompact,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
           ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Showing last ${widget.days} days',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: PulsePathColors.textSecondary,
+              Flexible(
+                child: Text(
+                  'Showing last ${widget.days} days',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: PulsePathColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
-                'Recorded days: ${nonNullValues.length}/${recordedEntries.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: PulsePathColors.cyan,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Recorded days: ${nonNullValues.length}/${recordedEntries.length}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: PulsePathColors.cyan,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -158,11 +180,15 @@ class _BarColumn extends StatelessWidget {
     required this.entry,
     required this.metric,
     required this.maxValue,
+    required this.columnWidth,
+    required this.isCompact,
   });
 
   final ActivityHistoryEntry entry;
   final RealProgressionMetric metric;
   final double maxValue;
+  final double columnWidth;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -175,51 +201,59 @@ class _BarColumn extends StatelessWidget {
             : value.round().toString())
         : '--';
 
+    // Dynamic bar width: leave 2dp gap per side, minimum 2dp bar
+    final barWidth = (columnWidth - 4).clamp(2.0, 14.0);
+
     return Tooltip(
       message: '${entry.date.day}/${entry.date.month}: '
           '${hasValue ? "$formattedValue ${metric.unit}" : "Not recorded"}',
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(
-            formattedValue,
-            style: TextStyle(
-              fontSize: 9,
-              fontFamily: 'monospace',
-              color: hasValue ? metric.color : PulsePathColors.textSecondary,
-              fontWeight: hasValue ? FontWeight.bold : FontWeight.normal,
+          // Hide value text in compact mode (30-day) to prevent overflow
+          if (!isCompact)
+            Text(
+              formattedValue,
+              style: TextStyle(
+                fontSize: 9,
+                fontFamily: 'monospace',
+                color: hasValue ? metric.color : PulsePathColors.textSecondary,
+                fontWeight: hasValue ? FontWeight.bold : FontWeight.normal,
+              ),
+              overflow: TextOverflow.clip,
+              maxLines: 1,
             ),
-          ),
-          const SizedBox(height: 4),
+          if (!isCompact) const SizedBox(height: 4),
           Expanded(
             child: Container(
               alignment: Alignment.bottomCenter,
-              child: FractionalTranslation(
-                translation: Offset.zero,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: 14,
-                  height: 120 * heightFactor,
-                  decoration: BoxDecoration(
-                    color: hasValue
-                        ? metric.color.withValues(alpha: 0.85)
-                        : PulsePathColors.divider.withValues(alpha: 0.3),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(4),
-                    ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: barWidth,
+                height: 120 * heightFactor,
+                decoration: BoxDecoration(
+                  color: hasValue
+                      ? metric.color.withValues(alpha: 0.85)
+                      : PulsePathColors.divider.withValues(alpha: 0.3),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            '${entry.date.day}/${entry.date.month}',
-            style: const TextStyle(
-              fontSize: 9,
-              color: PulsePathColors.textSecondary,
+          // Hide date text in compact mode to prevent overflow
+          if (!isCompact)
+            Text(
+              '${entry.date.day}/${entry.date.month}',
+              style: const TextStyle(
+                fontSize: 9,
+                color: PulsePathColors.textSecondary,
+              ),
+              overflow: TextOverflow.clip,
+              maxLines: 1,
             ),
-          ),
         ],
       ),
     );

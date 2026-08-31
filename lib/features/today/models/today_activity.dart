@@ -59,6 +59,39 @@ class TodayActivity {
   final String activeMinutesProvenance;
 
   bool get isRecorded => recordingStatus != ActivityRecordingStatus.unrecorded;
+
+  TodayActivity copyWith({
+    DateTime? date,
+    double? steps,
+    double? activeMinutes,
+    double? distance,
+    double? calories,
+    double? dailyScore,
+    String? scoreVersion,
+    String? source,
+    ActivityRecordingStatus? recordingStatus,
+    String? stepsProvenance,
+    String? distanceProvenance,
+    String? caloriesProvenance,
+    String? activeMinutesProvenance,
+  }) {
+    return TodayActivity(
+      date: date ?? this.date,
+      steps: steps ?? this.steps,
+      activeMinutes: activeMinutes ?? this.activeMinutes,
+      distance: distance ?? this.distance,
+      calories: calories ?? this.calories,
+      dailyScore: dailyScore ?? this.dailyScore,
+      scoreVersion: scoreVersion ?? this.scoreVersion,
+      source: source ?? this.source,
+      recordingStatus: recordingStatus ?? this.recordingStatus,
+      stepsProvenance: stepsProvenance ?? this.stepsProvenance,
+      distanceProvenance: distanceProvenance ?? this.distanceProvenance,
+      caloriesProvenance: caloriesProvenance ?? this.caloriesProvenance,
+      activeMinutesProvenance:
+          activeMinutesProvenance ?? this.activeMinutesProvenance,
+    );
+  }
 }
 
 enum ActivityRecordingStatus {

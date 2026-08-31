@@ -169,6 +169,10 @@ class _JourneyScreenState extends ConsumerState<JourneyScreen> {
 
   String _selectionLabel(ActivityHistoryEntry entry) {
     final value = _metric.valueOf(entry);
+    if (value == null) {
+      return '${entry.date.day}/${entry.date.month}/${entry.date.year} · '
+          'Not recorded';
+    }
     final formatted = _metric == HistoryMetric.distance
         ? value.toStringAsFixed(2)
         : value.round().toString();
@@ -526,7 +530,10 @@ class _HistoryChartPainter extends CustomPainter {
     }
     final maxValue = math.max(
       1.0,
-      entries.map(metric.valueOf).fold<double>(0, math.max),
+      entries
+          .map((e) => metric.valueOf(e))
+          .whereType<double>()
+          .fold<double>(0, math.max),
     );
     final confirmedPointPaint = Paint()..color = PulsePathColors.cyan;
     final legacyPointPaint = Paint()
@@ -542,11 +549,18 @@ class _HistoryChartPainter extends CustomPainter {
     for (final entry in entries) {
       final index = DateUtils.dateOnly(entry.date).difference(start).inDays;
       if (index < 0 || index >= days) continue;
+      final value = metric.valueOf(entry);
+      if (value == null) {
+        // Missing data — break the line, leave a gap. No dot plotted.
+        previous = null;
+        previousIndex = null;
+        continue;
+      }
       final x = (index + 0.5) * size.width / days;
       final y =
           size.height -
           5 -
-          (metric.valueOf(entry) / maxValue * (size.height - 10));
+          (value / maxValue * (size.height - 10));
       final point = Offset(x, y);
       if (previous != null &&
           previousIndex != null &&

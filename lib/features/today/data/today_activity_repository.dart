@@ -66,10 +66,6 @@ class TodayActivityRepository {
     if (resetDistanceToAuto) body['reset_distance_to_auto'] = true;
     if (resetCaloriesToAuto) body['reset_calories_to_auto'] = true;
 
-    print(
-      '[VALIDATION_GATE][CHECKPOINT_5] TodayActivityRepository payload sent to FastAPI: $body',
-    );
-
     final response = await _apiClient.patchJson('/activity/today', body);
     return TodayActivity.fromJson(response);
   }
@@ -79,7 +75,8 @@ class TodayActivityRepository {
     required List<StepSampleRecord> samples,
   }) async {
     if (samples.isEmpty) return;
-    final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     final payload = {
       'date': dateStr,
       'samples': samples.map((s) => s.toJson()).toList(),

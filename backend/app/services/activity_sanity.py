@@ -1,26 +1,9 @@
 """
 Physical Metric Sanity Module for PulsePath.
-Provides physical conversion formulas and validation boundaries for physical activity metrics.
-- Distance (km): 1 step = 0.000762 km (stride ~0.762m)
-- Calories (kcal): 0.04 kcal/step
-
-Active Minutes intentionally have no estimator. They come only from recorded
-Health Connect workout/exercise duration or valid manual input.
+Provides boundary validation for physical activity metrics.
+PulsePath does NOT derive distance or calories from steps.
+All metrics must come from recorded evidence (Health Connect) or explicit user input.
 """
-
-
-def estimate_distance_km(steps: float | int) -> float:
-    """Estimates walking distance in kilometers based on steps (stride ~0.762m)."""
-    if steps < 0:
-        raise ValueError("Steps cannot be negative")
-    return round(float(steps) * 0.000762, 2)
-
-
-def estimate_calories_kcal(steps: float | int) -> float:
-    """Estimates active calories burned based on steps (0.04 kcal/step)."""
-    if steps < 0:
-        raise ValueError("Steps cannot be negative")
-    return round(float(steps) * 0.04, 1)
 
 
 def validate_metric_sanity(

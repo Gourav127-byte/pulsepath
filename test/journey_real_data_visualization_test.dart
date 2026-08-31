@@ -99,16 +99,20 @@ void main() {
 
       expect(find.text('Real Metric Progression'), findsOneWidget);
       expect(find.text('Missing != Zero'), findsOneWidget);
+      expect(find.text('Steps'), findsOneWidget);
       expect(find.text('Distance'), findsOneWidget);
-      expect(find.text('Active Time'), findsOneWidget);
       expect(find.text('Calories'), findsOneWidget);
 
-      // Tap Active Time tab
-      await tester.tap(find.text('Active Time'));
+      // Verify Steps tab shows step counts
+      expect(find.text('5000'), findsOneWidget);
+      expect(find.text('3000'), findsOneWidget);
+
+      // Tap Distance tab
+      await tester.tap(find.text('Distance'));
       await tester.pumpAndSettle();
 
-      expect(find.text('40'), findsOneWidget);
-      expect(find.text('25'), findsOneWidget);
+      expect(find.text('3.8'), findsOneWidget);
+      expect(find.text('--'), findsOneWidget); // Missing distance renders --
     });
   });
 }

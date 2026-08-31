@@ -23,6 +23,7 @@ import '../widgets/manual_activity_edit_sheet.dart';
 import '../../veya/providers/veya_providers.dart';
 import '../../veya/widgets/veya_insights_card.dart';
 import '../../veya/widgets/veya_chat_sheet.dart';
+import '../../distance/widgets/distance_recorder_card.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
@@ -312,6 +313,8 @@ class _ActivityContent extends ConsumerWidget {
           trailing: const _HealthSyncIndicator(),
         ),
         const SizedBox(height: 12),
+        const DistanceRecorderCard(),
+        const SizedBox(height: 14),
         _MetricsGrid(activity: activity, goals: goals),
         const SizedBox(height: 26),
         const _SectionTitle(title: 'Daily progress'),
@@ -516,7 +519,9 @@ class _MetricsGrid extends StatelessWidget {
               child: MetricCard(
                 label: ActivityMetricType.distance.shortLabel,
                 value: activity.distance != null
-                    ? activity.distance!.toStringAsFixed(1)
+                    ? (activity.distance! < 1.0 && activity.distance! > 0.0
+                        ? activity.distance!.toStringAsFixed(2)
+                        : activity.distance!.toStringAsFixed(1))
                     : '--',
                 unit: ActivityMetricType.distance.unit,
                 goal: distanceGoal.label,
@@ -723,12 +728,7 @@ class _HealthSyncIndicator extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: syncState.status == HealthSyncStatus.syncing
               ? null
-              : () async {
-                  final granted = await notifier.requestPermissions();
-                  if (granted) {
-                    await notifier.sync();
-                  }
-                },
+              : notifier.userInitiatedSync,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(

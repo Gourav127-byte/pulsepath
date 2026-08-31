@@ -50,7 +50,10 @@ class _PhoneAuthSheetState extends ConsumerState<PhoneAuthSheet> {
       phone = '+91$phone';
     }
     if (phone.isEmpty || phone.length < 7) {
-      setState(() => _error = 'Enter a valid phone number with country code (e.g. +919876543210)');
+      setState(
+        () => _error =
+            'Enter a valid phone number with country code (e.g. +919876543210)',
+      );
       return;
     }
     setState(() {
@@ -74,7 +77,11 @@ class _PhoneAuthSheetState extends ConsumerState<PhoneAuthSheet> {
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not request OTP. Check network connection.');
+      if (mounted) {
+        setState(
+          () => _error = 'Could not request OTP. Check network connection.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -103,7 +110,9 @@ class _PhoneAuthSheetState extends ConsumerState<PhoneAuthSheet> {
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Verification failed. Please try again.');
+      if (mounted) {
+        setState(() => _error = 'Verification failed. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -193,7 +202,9 @@ class _PhoneAuthSheetState extends ConsumerState<PhoneAuthSheet> {
             const SizedBox(height: 20),
             FilledButton(
               key: Key(_otpSent ? 'verify_otp_button' : 'request_otp_button'),
-              onPressed: _loading ? null : (_otpSent ? _verifyOtp : _requestOtp),
+              onPressed: _loading
+                  ? null
+                  : (_otpSent ? _verifyOtp : _requestOtp),
               child: _loading
                   ? const SizedBox(
                       width: 20,
@@ -214,15 +225,19 @@ class _PhoneAuthSheetState extends ConsumerState<PhoneAuthSheet> {
                     onPressed: _loading
                         ? null
                         : () => setState(() {
-                              _otpSent = false;
-                              _error = null;
-                            }),
+                            _otpSent = false;
+                            _error = null;
+                          }),
                     child: const Text('Change Phone Number'),
                   ),
                   TextButton(
-                    onPressed: (_loading || _cooldownLeft > 0) ? null : _requestOtp,
+                    onPressed: (_loading || _cooldownLeft > 0)
+                        ? null
+                        : _requestOtp,
                     child: Text(
-                      _cooldownLeft > 0 ? 'Resend in ${_cooldownLeft}s' : 'Resend Code',
+                      _cooldownLeft > 0
+                          ? 'Resend in ${_cooldownLeft}s'
+                          : 'Resend Code',
                       style: TextStyle(
                         color: _cooldownLeft > 0
                             ? PulsePathColors.textSecondary

@@ -68,9 +68,5 @@ class ProductionEmailProvider(EmailProvider):
 def get_email_provider() -> EmailProvider:
     provider_name = getattr(settings, "email_provider", "mock").lower()
     if provider_name != "mock":
-        try:
-            return ProductionEmailProvider()
-        except RuntimeError:
-            logger.warning("ProductionEmailProvider failed to initialize. Falling back to MockEmailProvider.")
-            return MockEmailProvider()
+        return ProductionEmailProvider()
     return MockEmailProvider()

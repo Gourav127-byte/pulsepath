@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'core/network/api_config.dart';
 import 'core/network/api_client.dart';
 import 'core/network/health_check_service.dart';
+import 'core/notifications/local_notification_service.dart';
 import 'core/theme/pulse_path_theme.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/startup/presentation/startup_screen.dart';
@@ -15,10 +16,34 @@ import 'features/startup/services/startup_sound.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('[FLUTTER_ERROR] ${details.exceptionAsString()}\n${details.stack}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[UNCAUGHT_ASYNC_ERROR] error=$error\n$stack');
+    return true;
+  };
+
+  runApp(const ProviderScope(child: PulsePathApp()));
+  unawaited(_initializeNotifications());
   if (kDebugMode) {
     unawaited(_logBackendHealth());
   }
-  runApp(const ProviderScope(child: PulsePathApp()));
+}
+
+Future<void> _initializeNotifications() async {
+  try {
+    await LocalNotificationService.instance.initialize();
+  } on Object catch (error) {
+    if (kDebugMode) {
+      debugPrint(
+        '[NOTIFICATION] initialization_failed type=${error.runtimeType}',
+      );
+    }
+  }
 }
 
 Future<void> _logBackendHealth() async {

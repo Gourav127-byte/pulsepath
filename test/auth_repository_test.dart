@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pulsepath/core/cache/temporary_demo_cache.dart';
 import 'package:pulsepath/core/network/api_client.dart';
 import 'package:pulsepath/features/auth/data/auth_repository.dart';
 import 'package:pulsepath/features/auth/data/token_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('login stores token and returns typed session', () async {
@@ -157,9 +159,12 @@ void main() {
   });
 
   test(
-    'temporary session verification failure preserves stored token and restores fallback',
+    'temporary session verification failure preserves stored token and restores cached profile',
     () async {
+      SharedPreferences.setMockInitialValues({});
       final storage = MemoryTokenStorage()..token = 'stored-token';
+      final cache = TemporaryDemoCache(userId: 'test-user');
+      await cache.saveProfile({'id': 'cached-id', 'email': 'alex@example.com'});
       final repository = AuthRepository(
         ApiClient(
           baseUrl: 'http://test/',
@@ -169,10 +174,12 @@ void main() {
           ),
         ),
         storage,
+        cache,
       );
 
       final user = await repository.restoreSession();
-      expect(user, isNotNull);
+      expect(user?.id, 'cached-id');
+      expect(user?.email, 'alex@example.com');
       expect(storage.token, 'stored-token');
     },
   );

@@ -5,7 +5,6 @@ import '../../../core/theme/pulse_path_theme.dart';
 import '../data/auth_repository.dart';
 import '../providers/auth_provider.dart';
 import 'email_auth_sheet.dart';
-import 'phone_auth_sheet.dart';
 
 enum _AuthPage { login, signUp, forgot, reset }
 
@@ -69,6 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+  bool _rememberMe = true;
 
   @override
   void dispose() {
@@ -90,36 +90,194 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final loading = auth.status == AuthStatus.loading;
     return _AuthScaffold(
       eyebrow: 'WELCOME BACK',
-      title: 'Keep moving forward.',
-      subtitle: 'Sign in to continue your PulsePath journey.',
+      title: 'Sign In',
+      subtitle: 'Welcome back! Please enter your details to access your dashboard.',
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _EmailField(controller: _email),
+            // Email Address Field
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: const TextSpan(
+                    text: 'Email Address ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: '*',
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  key: const Key('email_field'),
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'alex@company.com',
+                    prefixIcon: Icon(Icons.email_outlined, color: PulsePathColors.violet),
+                  ),
+                  validator: (value) {
+                    final email = value?.trim() ?? '';
+                    return !email.contains('@') ||
+                            email.startsWith('@') ||
+                            email.endsWith('@')
+                        ? 'Enter a valid email address.'
+                        : null;
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
-            _PasswordField(
-              key: const Key('login_password'),
-              controller: _password,
-              obscure: _obscure,
-              onToggle: () => setState(() => _obscure = !_obscure),
+
+            // Password Field & Forgot Password Link
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        text: 'Password ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: loading ? null : widget.onForgotPassword,
+                      child: const Text(
+                        'Forgot Password?',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: PulsePathColors.cyan,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  key: const Key('login_password'),
+                  controller: _password,
+                  obscureText: _obscure,
+                  textInputAction: TextInputAction.done,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: '••••••••••••',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: PulsePathColors.violet),
+                    suffixIcon: IconButton(
+                      tooltip: _obscure ? 'Show password' : 'Hide password',
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      icon: Icon(
+                        _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Enter your password.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: loading ? null : widget.onForgotPassword,
-                child: const Text('Forgot Password?'),
-              ),
+            const SizedBox(height: 12),
+
+            // Remember Me Row
+            Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    onChanged: (val) => setState(() => _rememberMe = val ?? true),
+                    activeColor: PulsePathColors.violet,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Remember me for faster sign in',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: PulsePathColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            if (auth.message != null) _ErrorText(auth.message!),
-            const SizedBox(height: 6),
+            if (auth.message != null) ...[
+              const SizedBox(height: 10),
+              _ErrorText(auth.message!),
+            ],
+            const SizedBox(height: 18),
+
+            // Sign In Button with Arrow
             FilledButton(
               key: const Key('login_button'),
               onPressed: loading ? null : _submit,
-              child: loading ? const _ButtonProgress() : const Text('Login'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PulsePathColors.violet,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: loading
+                  ? const _ButtonProgress()
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Sign In',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, size: 20, color: Colors.white),
+                      ],
+                    ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
+
+            // OR Divider
             Row(
               children: [
                 const Expanded(child: Divider()),
@@ -132,39 +290,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         alpha: 0.7,
                       ),
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 const Expanded(child: Divider()),
               ],
             ),
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              key: const Key('google_signin_button'),
-              onPressed: loading ? null : _googleSignIn,
-              icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-              label: const Text('Sign in with Google'),
+            const SizedBox(height: 18),
+
+            // Social Buttons Row (Google & Apple)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('google_signin_button'),
+                    onPressed: loading ? null : _googleSignIn,
+                    icon: const _GoogleLogoIcon(size: 18),
+                    label: const Text('Google'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('apple_signin_button'),
+                    onPressed: loading ? null : () {},
+                    icon: const Icon(Icons.apple, size: 20, color: Colors.white),
+                    label: const Text('Apple'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              key: const Key('phone_auth_button'),
-              onPressed: loading ? null : _openPhoneAuth,
-              icon: const Icon(Icons.phone_android_rounded, size: 20),
-              label: const Text('Sign in with Phone Number'),
-            ),
-            const SizedBox(height: 10),
+
+            // Email OTP Button
             OutlinedButton.icon(
               key: const Key('email_otp_auth_button'),
               onPressed: loading ? null : _openEmailAuth,
               icon: const Icon(Icons.mark_email_unread_rounded, size: 20),
-              label: const Text('Sign in with Email OTP'),
+              label: const Text('Sign in or Sign up with Email OTP'),
             ),
-            const SizedBox(height: 16),
-            _AuthLink(
-              prompt: 'New to PulsePath?',
-              action: 'Create account',
-              onPressed: loading ? null : widget.onSignUp,
+            const SizedBox(height: 20),
+
+            // Footer CTA
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'No account? ',
+                  style: TextStyle(color: PulsePathColors.textSecondary, fontSize: 13),
+                ),
+                GestureDetector(
+                  onTap: loading ? null : widget.onSignUp,
+                  child: const Text(
+                    'Create account',
+                    style: TextStyle(
+                      color: PulsePathColors.cyan,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -191,18 +379,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     }
-  }
-
-  void _openPhoneAuth() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: PulsePathColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const PhoneAuthSheet(),
-    );
   }
 
   void _openEmailAuth() {
@@ -254,8 +430,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final loading = auth.status == AuthStatus.loading;
     return _AuthScaffold(
       eyebrow: 'START YOUR PATH',
-      title: 'Build something better.',
-      subtitle: 'Create your PulsePath account in a few seconds.',
+      title: 'Create Account',
+      subtitle: 'Join PulsePath to track your steps, distance & daily scores.',
       child: Form(
         key: _formKey,
         child: Column(
@@ -275,7 +451,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               key: const Key('confirm_password'),
               controller: _confirm,
               obscureText: _obscure,
-              decoration: const InputDecoration(labelText: 'Confirm password'),
+              decoration: const InputDecoration(
+                labelText: 'Confirm password *',
+                hintText: 'Re-enter your password',
+                prefixIcon: Icon(Icons.lock_outline_rounded, color: PulsePathColors.violet),
+              ),
               validator: (value) =>
                   value != _password.text ? 'Passwords do not match.' : null,
             ),
@@ -304,7 +484,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         alpha: 0.7,
                       ),
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -410,7 +590,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       eyebrow: 'PASSWORD RECOVERY',
       title: 'Find your way back.',
       subtitle:
-          'Enter your email. If an account exists, reset instructions will be available.',
+          'Enter your email. If an account exists, reset instructions will be sent.',
       child: Form(
         key: _formKey,
         child: Column(
@@ -536,7 +716,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             TextFormField(
               key: const Key('reset_token'),
               controller: _token,
-              decoration: const InputDecoration(labelText: 'Reset token'),
+              decoration: const InputDecoration(
+                labelText: 'Reset token *',
+                hintText: 'Paste token sent to email',
+                prefixIcon: Icon(Icons.vpn_key_outlined, color: PulsePathColors.violet),
+              ),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Enter your reset token.'
                   : null,
@@ -555,7 +739,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               controller: _confirm,
               obscureText: _obscure,
               decoration: const InputDecoration(
-                labelText: 'Confirm new password',
+                labelText: 'Confirm new password *',
+                hintText: 'Re-enter new password',
+                prefixIcon: Icon(Icons.lock_outline_rounded, color: PulsePathColors.violet),
               ),
               validator: (value) =>
                   value != _password.text ? 'Passwords do not match.' : null,
@@ -626,9 +812,9 @@ class _AuthScaffold extends StatelessWidget {
                       letterSpacing: 1.8,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(title, style: Theme.of(context).textTheme.displaySmall),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     subtitle,
                     style: const TextStyle(
@@ -636,7 +822,7 @@ class _AuthScaffold extends StatelessWidget {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 26),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -675,7 +861,11 @@ class _EmailField extends StatelessWidget {
     keyboardType: TextInputType.emailAddress,
     textInputAction: TextInputAction.next,
     autocorrect: false,
-    decoration: const InputDecoration(labelText: 'Email'),
+    decoration: const InputDecoration(
+      labelText: 'Email Address *',
+      hintText: 'alex@company.com',
+      prefixIcon: Icon(Icons.email_outlined, color: PulsePathColors.violet),
+    ),
     validator: (value) {
       final email = value?.trim() ?? '';
       return !email.contains('@') ||
@@ -705,7 +895,9 @@ class _PasswordField extends StatelessWidget {
     obscureText: obscure,
     textInputAction: TextInputAction.done,
     decoration: InputDecoration(
-      labelText: validateLength ? 'Password (8+ characters)' : 'Password',
+      labelText: validateLength ? 'Password (8+ characters) *' : 'Password *',
+      hintText: '••••••••••••',
+      prefixIcon: const Icon(Icons.lock_outline_rounded, color: PulsePathColors.violet),
       suffixIcon: IconButton(
         tooltip: obscure ? 'Show password' : 'Hide password',
         onPressed: onToggle,
@@ -772,4 +964,68 @@ class _ButtonProgress extends StatelessWidget {
       color: PulsePathColors.background,
     ),
   );
+}
+
+class _GoogleLogoIcon extends StatelessWidget {
+  const _GoogleLogoIcon({this.size = 18.0});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _GoogleLogoPainter(),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+    final double radius = size.width / 2;
+    final double strokeWidth = size.width * 0.22;
+    final Rect rect = Rect.fromCircle(
+      center: Offset(cx, cy),
+      radius: radius - strokeWidth / 2,
+    );
+
+    final Paint paintRed = Paint()
+      ..color = const Color(0xFFEA4335)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final Paint paintYellow = Paint()
+      ..color = const Color(0xFFFBBC05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final Paint paintGreen = Paint()
+      ..color = const Color(0xFF34A853)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final Paint paintBlue = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawArc(rect, -0.4, 1.4, false, paintRed);
+    canvas.drawArc(rect, 1.0, 1.1, false, paintYellow);
+    canvas.drawArc(rect, 2.1, 1.4, false, paintGreen);
+    canvas.drawArc(rect, 3.5, 1.2, false, paintBlue);
+
+    final Paint barPaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRect(
+      Rect.fromLTWH(cx - 1, cy - strokeWidth / 2, radius * 0.9, strokeWidth),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

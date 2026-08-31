@@ -117,6 +117,26 @@ void main() {
     },
   );
 
+  test('clearAll removes only the signed-out user cache', () async {
+    const cacheA = TemporaryDemoCache(userId: 'user-a');
+    const cacheB = TemporaryDemoCache(userId: 'user-b');
+    await cacheA.saveToday(todayJson);
+    await cacheA.saveGoals(goalsJson);
+    await cacheA.saveProfile(profileJson);
+    await cacheA.saveHistory(7, [todayJson]);
+    await cacheA.saveHistory(30, [todayJson]);
+    await cacheB.saveToday({...todayJson, 'steps': 10000.0});
+
+    await cacheA.clearAll();
+
+    expect(await cacheA.loadToday(), isNull);
+    expect(await cacheA.loadGoals(), isNull);
+    expect(await cacheA.loadProfile(), isNull);
+    expect(await cacheA.loadHistory(7), isNull);
+    expect(await cacheA.loadHistory(30), isNull);
+    expect((await cacheB.loadToday())?['steps'], 10000.0);
+  });
+
   test('network failure without cached data remains an error', () async {
     final offlineClient = MockClient((_) async => http.Response('', 503));
     final repository = TodayActivityRepository(

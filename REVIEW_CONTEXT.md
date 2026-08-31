@@ -1,8 +1,9 @@
-# 📱 PulsePath Architecture & Code Review Context
+# 📱 PulsePath Architecture & Code Review Context (Codex / Third-Party Review)
 
 **Project:** PulsePath — Personal Activity Tracking, Daily Scoring, and Habit Analytics  
-**Date:** August 26, 2026  
-**Audience:** Third-Party Code Reviewers (Qwen Code Review)  
+**Date:** August 27, 2026  
+**Audience:** Independent Third-Party Code Reviewers (Codex Review)  
+**Live Production API URL:** [`https://pulsepath-2-yg33.onrender.com`](https://pulsepath-2-yg33.onrender.com)  
 **Security Status:** 🔒 **SANITIZED ARCHIVE — Zero real secrets, API keys, credentials, or keystores included.**
 
 ---
@@ -12,10 +13,10 @@
 PulsePath is a full-stack personal fitness and habit tracking platform designed around strict data integrity, privacy-first health integration, and grounded AI reasoning.
 
 ```text
-[ Flutter 3.x Mobile Client ] ──► HTTPS / REST ──► [ FastAPI Backend (Python 3.14) ]
-  ├── Riverpod 2.6 State Management                  ├── SQLAlchemy 2.0 ORM + Pydantic v2
-  ├── Native Health Connect (Android)                ├── Alembic Migration Engine
-  └── Secure Token & State Persistence               └── PostgreSQL 15+ Database
+[ Flutter 3.x Mobile Client ] ──► HTTPS (TLS 1.3) ──► [ FastAPI Backend (Render Container) ]
+  ├── Riverpod 2.6 State Management                     ├── SQLAlchemy 2.0 ORM + Pydantic v2
+  ├── Native Health Connect (Android 14/15)             ├── Alembic Migration Engine (Head 100978b7787f)
+  └── Secure Token & State Persistence                  └── Managed PostgreSQL 15 Database (SSL)
 ```
 
 ---
@@ -35,32 +36,22 @@ PulsePath is a full-stack personal fitness and habit tracking platform designed 
 4. **Phase 19: Activity Timeline & Intraday Step Trace (Batches 1–3)**
    - Database Table: `activity_step_samples` with `user_id`, `start_time`, `end_time`, `steps`, `source_origin`, and unique `sample_id` constraint.
    - Health Connect Intraday Aggregation: Native 15-minute duration-grouped aggregation engine (`getTotalStepsInInterval`).
-   - Physical Validation: Verified live on Vivo Y27 (Android 15) with 4 real duration aggregate step buckets.
-5. **Beta Readiness: Production Deployment Gate**
-   - Production Environment Config: `APP_ENV=production`, 256-bit random JWT secret requirement, `sslmode=require` database SSL.
-   - Alembic Migration Head: `100978b7787f_add_activity_step_samples_table.py`.
+   - Physical Device Validation: Verified live on Vivo Y27 (Android 15) with 4 real duration aggregate step buckets.
+5. **Phase 20: Production Cloud Deployment (Render)**
+   - Live HTTPS Backend: `https://pulsepath-2-yg33.onrender.com/health` returning `200 OK` (`{"status":"ok"}`).
+   - Managed PostgreSQL 15 connected via SSL (`sslmode=require`).
+   - Automated Alembic Migration: `100978b7787f_add_activity_step_samples_table.py` executed on container startup.
+   - Gunicorn Memory Optimization: Process workers capped to 2 workers (~90MB RAM) fitting inside Render's 512MB RAM container tier.
 
 ---
 
 ## 3. 🔒 Locked PulsePath Contracts & Invariants
 
-> [!IMPORTANT]
-> The following system contracts are strictly enforced across the codebase and must be preserved during code review and refactoring:
-
-1. **Missing ≠ Zero Semantics:**
-   - Unrecorded or missing sensor data MUST evaluate to `null` / `None` (`Not recorded`).
-   - Missing data must NEVER be converted to `0.0` or fake zero.
-2. **No Client-Side Metric Invention:**
-   - Distance and Calories must NEVER be generated client-side from step counts using arbitrary multipliers.
-   - Metrics are derived strictly from native Health Connect samples or explicit manual user logs.
-3. **15-Minute Duration Bucket Boundaries:**
-   - Timeline interval timestamps (`start_time`, `end_time`) represent native Health Connect aggregation window boundaries.
-   - Daily step totals are NEVER split or interpolated into fake individual step timestamps.
-4. **Idempotency Guarantee:**
-   - Database enforces `UNIQUE(user_id, sample_id)` on `activity_step_samples`. Repeated sync taps perform in-place upserts without duplicate row accumulation.
-5. **Strict Auth & Security Scoping:**
-   - User isolation enforced on every SQL query (`Activity.user_id == current_user.id`).
-   - Secrets must NEVER be hardcoded or exposed in API responses (`EXPOSE_PASSWORD_RESET_TOKEN = False` in production).
+1. **Missing ≠ Zero Semantics:** Unrecorded sensor data evaluates to `null` (`Not recorded`), never converted to `0.0`.
+2. **No Client-Side Metric Invention:** Distance and Calories derived strictly from native Health Connect samples or explicit manual user logs.
+3. **15-Minute Duration Bucket Boundaries:** Intraday timeline timestamps represent native Health Connect aggregation bounds.
+4. **Idempotency Guarantee:** Database enforces `UNIQUE(user_id, sample_id)` on `activity_step_samples`.
+5. **Strict Auth & Security Scoping:** User isolation enforced on every SQL query (`Activity.user_id == current_user.id`).
 
 ---
 
@@ -68,29 +59,8 @@ PulsePath is a full-stack personal fitness and habit tracking platform designed 
 
 | Test Suite | Execution Command | Total Tests | Status |
 | :--- | :--- | :--- | :--- |
-| **FastAPI Backend Pytest Suite** | `pytest tests/` | **237 / 237** | 100% Passed |
+| **FastAPI Backend Pytest Suite** | `pytest tests/` | **237 / 237** | 100% Passed (21.72s) |
+| **VEYA Backend Pytest Suite** | `pytest tests/test_phase17_veya_*.py` | **38 / 38** | 100% Passed |
 | **Flutter Widget & Unit Suite** | `flutter test` | **146 / 146** | 100% Passed |
 | **Flutter Static Analyzer** | `flutter analyze` | **0 Errors** | Clean Analysis |
-
----
-
-## 5. 📂 Source Code Structure in This Review Package
-
-```text
-pulsepath_qwen_review.zip
-├── REVIEW_CONTEXT.md                  <-- This architecture summary
-├── pubspec.yaml                       <-- Flutter dependencies manifest
-├── lib/                               <-- Flutter client source code
-│   ├── core/                          <-- Theme, network, security, models
-│   └── features/                      <-- Auth, Today, Journey, VEYA features
-├── test/                              <-- Flutter widget & unit tests
-├── android/                           <-- Android native app configuration & manifests
-└── backend/                           <-- FastAPI Python backend
-    ├── requirements.txt               <-- Python dependencies manifest
-    ├── alembic.ini                    <-- Database migration config
-    ├── .env.example                   <-- Sanitized dev environment template
-    ├── .env.production.example        <-- Sanitized prod environment template
-    ├── app/                           <-- API routes, DB models, schemas, services
-    ├── migrations/                    <-- Alembic SQL database migrations
-    └── tests/                         <-- Pytest backend test suite
-```
+| **Live Remote `/health` Smoke Test** | `curl https://pulsepath-2-yg33.onrender.com/health` | **200 OK** | `{"status":"ok"}` |

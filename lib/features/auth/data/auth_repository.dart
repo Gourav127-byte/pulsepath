@@ -216,7 +216,7 @@ class AuthRepository {
         }
         return null;
       }
-      // OFFLINE / UNREACHABLE BACKEND: Preserve session and restore cached profile!
+      // OFFLINE / UNREACHABLE BACKEND: Preserve session and restore cached profile if available.
       final cached = await _cache?.loadProfile();
       if (cached != null && cached['id'] is String) {
         return AuthUser(
@@ -224,11 +224,8 @@ class AuthRepository {
           email: (cached['email'] as String?) ?? '',
         );
       }
-      // If no cached profile but token exists, return offline session fallback
-      return const AuthUser(
-        id: 'offline-user',
-        email: 'offline@pulsepath.local',
-      );
+      // If no cached profile and backend is unreachable, do not synthesize a fake user.
+      return null;
     } on AuthException {
       rethrow;
     } on Object {

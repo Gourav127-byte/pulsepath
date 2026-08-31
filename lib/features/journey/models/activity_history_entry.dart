@@ -77,10 +77,10 @@ extension HistoryMetricDetails on HistoryMetric {
     HistoryMetric.dailyScore => 'points',
   };
 
-  double valueOf(ActivityHistoryEntry entry) => switch (this) {
-    HistoryMetric.steps => entry.steps ?? 0.0,
-    HistoryMetric.distance => entry.distance ?? 0.0,
-    HistoryMetric.activeCalories => entry.activeCalories ?? 0.0,
-    HistoryMetric.dailyScore => entry.dailyScore ?? 0.0,
+  double? valueOf(ActivityHistoryEntry entry) => switch (this) {
+    HistoryMetric.steps => entry.steps,
+    HistoryMetric.distance => entry.distance,
+    HistoryMetric.activeCalories => entry.activeCalories,
+    HistoryMetric.dailyScore => entry.dailyScore,
   };
 }

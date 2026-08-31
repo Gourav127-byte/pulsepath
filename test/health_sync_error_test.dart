@@ -122,12 +122,18 @@ class MockHistoryRepo implements ActivityHistoryRepository {
 
 class MockNotificationService implements NotificationService {
   int syncNotices = 0;
+  int permissionRequests = 0;
+  Completer<void>? permissionBlocker;
 
   @override
   Future<void> initialize() async {}
 
   @override
-  Future<bool> requestPermissions() async => true;
+  Future<bool> requestPermissions() async {
+    permissionRequests++;
+    await permissionBlocker?.future;
+    return true;
+  }
 
   @override
   Future<bool> areNotificationsEnabled() async => true;
@@ -315,5 +321,43 @@ void main() {
         HealthSyncStatus.success,
       );
     });
+
+    test(
+      'rapid user sync requests share permission and sync execution',
+      () async {
+        final repository = MockFailingSyncRepository();
+        final notifications = MockNotificationService()
+          ..permissionBlocker = Completer<void>();
+        final container = ProviderContainer(
+          overrides: [
+            healthSyncRepositoryProvider.overrideWithValue(repository),
+            todayActivityRepositoryProvider.overrideWithValue(MockTodayRepo()),
+            activityHistoryRepositoryProvider.overrideWithValue(
+              MockHistoryRepo(),
+            ),
+            notificationServiceProvider.overrideWithValue(notifications),
+          ],
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(
+          healthSyncControllerProvider.notifier,
+        );
+
+        final requests = List.generate(
+          5,
+          (_) => controller.userInitiatedSync(),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(notifications.permissionRequests, 1);
+        expect(repository.syncCalls, 0);
+
+        notifications.permissionBlocker!.complete();
+        await Future.wait(requests);
+
+        expect(notifications.permissionRequests, 1);
+        expect(repository.syncCalls, 1);
+        expect(notifications.syncNotices, 1);
+      },
+    );
   });
 }

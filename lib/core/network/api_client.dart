@@ -25,7 +25,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     client: ref.watch(httpClientProvider),
     authTokenProvider: tokenStorage.readToken,
     refreshTokenProvider: tokenStorage.readRefreshToken,
-    onTokenRefreshed: (access, refresh) => tokenStorage.saveToken(access, refresh),
+    onTokenRefreshed: (access, refresh) =>
+        tokenStorage.saveToken(access, refresh),
     onUnauthorized: () {
       ref.read(unauthorizedProvider.notifier).state = true;
     },
@@ -49,7 +50,8 @@ class ApiClient {
   final Duration requestTimeout;
   final Future<String?> Function()? authTokenProvider;
   final Future<String?> Function()? refreshTokenProvider;
-  final Future<void> Function(String accessToken, String refreshToken)? onTokenRefreshed;
+  final Future<void> Function(String accessToken, String refreshToken)?
+  onTokenRefreshed;
   final void Function()? onUnauthorized;
 
   Completer<String?>? _refreshCompleter;
@@ -65,7 +67,9 @@ class ApiClient {
 
   Uri _resolveUri(String path) {
     final base = _baseUri.toString();
-    final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final cleanBase = base.endsWith('/')
+        ? base.substring(0, base.length - 1)
+        : base;
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$cleanBase$cleanPath');
   }
@@ -167,7 +171,11 @@ class ApiClient {
     required Map<String, String> initialHeaders,
     bool skipRefresh = false,
   }) async {
-    final response = await _send(send, initialHeaders: initialHeaders, skipRefresh: skipRefresh);
+    final response = await _send(
+      send,
+      initialHeaders: initialHeaders,
+      skipRefresh: skipRefresh,
+    );
     try {
       return jsonDecode(response.body);
     } on FormatException {
@@ -216,16 +224,30 @@ class ApiClient {
     } on NetworkException {
       rethrow;
     } on TimeoutException catch (e) {
-      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] TimeoutException | type: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint(
+          '[NETWORKING_AUDIT] TimeoutException | type: ${e.runtimeType}',
+        );
+      }
       throw const NetworkException('Request timed out.');
     } on SocketException catch (e) {
-      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] SocketException | type: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint(
+          '[NETWORKING_AUDIT] SocketException | type: ${e.runtimeType}',
+        );
+      }
       throw const NetworkException('Could not connect to the server.');
     } on http.ClientException catch (e) {
-      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] ClientException | type: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint(
+          '[NETWORKING_AUDIT] ClientException | type: ${e.runtimeType}',
+        );
+      }
       throw const NetworkException('Could not connect to the server.');
     } catch (e) {
-      if (kDebugMode) debugPrint('[NETWORKING_AUDIT] Exception | type: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint('[NETWORKING_AUDIT] Exception | type: ${e.runtimeType}');
+      }
       throw const NetworkException('Could not connect to the server.');
     }
   }

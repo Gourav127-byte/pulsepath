@@ -13,11 +13,16 @@ class PulsePathStartupSound implements StartupSoundPlayer {
 
   @override
   Future<void> play() async {
-    await _player.setReleaseMode(ReleaseMode.stop);
-    await _player.play(
-      AssetSource('audio/pulsepath_startup.wav'),
-      volume: 0.65,
-    );
+    try {
+      await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.play(
+        AssetSource('audio/pulsepath_startup.wav'),
+        volume: 0.65,
+      );
+    } on Object {
+      // Audio playback failure on physical devices (e.g. no audio focus, codec error)
+      // must never crash the startup sequence.
+    }
   }
 
   @override

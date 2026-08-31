@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/cache/temporary_demo_cache.dart';
 import '../data/auth_repository.dart';
 import '../data/token_storage.dart';
 import '../models/auth_session.dart';
@@ -80,7 +81,11 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    final userId = state.user?.id;
     await _repository!.logout();
+    if (userId != null && userId.isNotEmpty) {
+      await TemporaryDemoCache(userId: userId).clearAll();
+    }
     state = const AuthState.unauthenticated();
   }
 }

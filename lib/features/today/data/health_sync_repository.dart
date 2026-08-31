@@ -37,12 +37,10 @@ class HealthSyncRepository {
           samples: data.timelineSamples,
         );
       } on Object catch (error) {
-        if (kDebugMode) {
-          debugPrint(
-            '[HEALTH_SYNC] stage=timeline_upload_failed '
-            'type=${error.runtimeType}',
-          );
-        }
+        debugPrint(
+          '[HEALTH_SYNC] WARNING: stage=timeline_upload_failed '
+          'type=${error.runtimeType} error=$error',
+        );
       }
     }
 

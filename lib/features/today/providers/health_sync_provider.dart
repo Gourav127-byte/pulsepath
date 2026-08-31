@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/notifications/local_notification_service.dart';
 import '../../journey/providers/activity_history_provider.dart';
 import '../data/health_sync_repository.dart';
 import '../services/health_connect_service.dart';
@@ -18,12 +20,20 @@ final healthSyncRepositoryProvider = Provider<HealthSyncRepository>((ref) {
 
 enum HealthSyncStatus { idle, syncing, success, error, unauthorized }
 
+enum HealthSyncIssue { unavailable, permission, network, read }
+
 class HealthSyncState {
-  const HealthSyncState({required this.status, this.message, this.lastSuccessfulSync});
+  const HealthSyncState({
+    required this.status,
+    this.message,
+    this.lastSuccessfulSync,
+    this.issue,
+  });
 
   final HealthSyncStatus status;
   final String? message;
   final DateTime? lastSuccessfulSync;
+  final HealthSyncIssue? issue;
 }
 
 class HealthSyncController extends StateNotifier<HealthSyncState> {
@@ -32,13 +42,16 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
 
   final HealthSyncRepository _repository;
   final Ref _ref;
+  Future<void>? _syncInFlight;
+  Future<void>? _userSyncInFlight;
   static const syncFreshnessThreshold = Duration(minutes: 5);
 
   Future<void> syncIfStale() async {
     if (state.status == HealthSyncStatus.syncing) return;
 
     final last = state.lastSuccessfulSync;
-    if (last != null && DateTime.now().difference(last) < syncFreshnessThreshold) {
+    if (last != null &&
+        DateTime.now().difference(last) < syncFreshnessThreshold) {
       return; // Skip sync if fresh (< 5 mins)
     }
 
@@ -49,9 +62,34 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
     }
   }
 
-  Future<void> sync() async {
-    if (state.status == HealthSyncStatus.syncing) return;
+  Future<void> sync({bool showNotification = false}) {
+    final existing = _syncInFlight;
+    if (existing != null) return existing;
+    final operation = _runSync(showNotification: showNotification);
+    _syncInFlight = operation;
+    return operation.whenComplete(() => _syncInFlight = null);
+  }
 
+  Future<void> userInitiatedSync() {
+    final existing = _userSyncInFlight;
+    if (existing != null) return existing;
+    final operation = _runUserInitiatedSync();
+    _userSyncInFlight = operation;
+    return operation.whenComplete(() => _userSyncInFlight = null);
+  }
+
+  Future<void> _runUserInitiatedSync() async {
+    await _ref.read(notificationServiceProvider).requestPermissions();
+    if (state.status == HealthSyncStatus.unauthorized ||
+        state.issue == HealthSyncIssue.unavailable ||
+        state.issue == HealthSyncIssue.permission) {
+      final granted = await requestPermissions();
+      if (!granted) return;
+    }
+    await sync(showNotification: true);
+  }
+
+  Future<void> _runSync({required bool showNotification}) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
       state = HealthSyncState(
         status: HealthSyncStatus.error,
@@ -67,22 +105,13 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
     );
 
     try {
-      final service = _ref.read(healthConnectServiceProvider);
-      if (!await service.isAvailable()) {
-        state = HealthSyncState(
-          status: HealthSyncStatus.error,
-          message: 'Health Connect is not available on this device.',
-          lastSuccessfulSync: state.lastSuccessfulSync,
-        );
-        return;
-      }
-
       final outcome = await _repository.sync();
       if (outcome == HealthSyncOutcome.unavailable) {
         state = HealthSyncState(
           status: HealthSyncStatus.error,
           message: 'Health Connect is not available on this device.',
           lastSuccessfulSync: state.lastSuccessfulSync,
+          issue: HealthSyncIssue.unavailable,
         );
         return;
       }
@@ -104,22 +133,64 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
         _ref.invalidate(activityHistoryProvider(7));
         _ref.invalidate(activityHistoryProvider(30));
       }
+      if (showNotification) {
+        try {
+          await _ref
+              .read(notificationServiceProvider)
+              .showSyncStatus(
+                success: true,
+                syncedCount: outcome == HealthSyncOutcome.updated ? 1 : 0,
+              );
+        } on Object catch (error) {
+          if (kDebugMode) {
+            debugPrint(
+              '[NOTIFICATION] health_sync_notice_failed '
+              'type=${error.runtimeType}',
+            );
+          }
+        }
+      }
     } on HealthConnectPermissionException {
       state = HealthSyncState(
         status: HealthSyncStatus.unauthorized,
         message: 'Health Connect permissions were not granted.',
         lastSuccessfulSync: state.lastSuccessfulSync,
+        issue: HealthSyncIssue.permission,
       );
-    } on Object {
+    } on NetworkException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[HEALTH_SYNC] stage=backend_failed status=${error.statusCode}',
+        );
+      }
       state = HealthSyncState(
         status: HealthSyncStatus.error,
-        message: 'Failed to sync health data.',
+        message:
+            'Could not sync with PulsePath. Check your connection and retry.',
         lastSuccessfulSync: state.lastSuccessfulSync,
+        issue: HealthSyncIssue.network,
+      );
+    } on Object catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[HEALTH_SYNC] stage=health_read_failed type=${error.runtimeType}',
+        );
+      }
+      state = HealthSyncState(
+        status: HealthSyncStatus.error,
+        message: 'Health Connect could not be read. Please retry.',
+        lastSuccessfulSync: state.lastSuccessfulSync,
+        issue: HealthSyncIssue.read,
       );
     }
   }
 
   Future<bool> requestPermissions() async {
+    if (state.status == HealthSyncStatus.syncing) return false;
+    state = HealthSyncState(
+      status: HealthSyncStatus.syncing,
+      lastSuccessfulSync: state.lastSuccessfulSync,
+    );
     try {
       final granted = await _ref
           .read(healthConnectServiceProvider)
@@ -129,6 +200,12 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
           status: HealthSyncStatus.unauthorized,
           message: 'Health Connect permissions were not granted.',
           lastSuccessfulSync: state.lastSuccessfulSync,
+          issue: HealthSyncIssue.permission,
+        );
+      } else {
+        state = HealthSyncState(
+          status: HealthSyncStatus.idle,
+          lastSuccessfulSync: state.lastSuccessfulSync,
         );
       }
       return granted;
@@ -137,6 +214,7 @@ class HealthSyncController extends StateNotifier<HealthSyncState> {
         status: HealthSyncStatus.error,
         message: 'Could not request Health Connect permissions.',
         lastSuccessfulSync: state.lastSuccessfulSync,
+        issue: HealthSyncIssue.permission,
       );
       return false;
     }

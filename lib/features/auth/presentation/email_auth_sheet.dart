@@ -133,7 +133,7 @@ class _EmailAuthSheetState extends ConsumerState<EmailAuthSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Email Verification',
+                'Email OTP Sign In / Sign Up',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -141,17 +141,18 @@ class _EmailAuthSheetState extends ConsumerState<EmailAuthSheet> {
                 ),
               ),
               IconButton(
+                tooltip: 'Close sheet',
                 icon: const Icon(Icons.close, color: Colors.white54),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             _otpSent
                 ? 'Enter the 6-digit code sent to ${_emailController.text.trim()}'
-                : 'Enter your email address to receive a verification code.',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+                : 'Enter your email address. We\'ll send a secure code to sign you in or create your account automatically.',
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
           ),
           const SizedBox(height: 20),
           if (!_otpSent)
@@ -160,7 +161,8 @@ class _EmailAuthSheetState extends ConsumerState<EmailAuthSheet> {
               keyboardType: TextInputType.emailAddress,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: 'Email Address (e.g. user@gmail.com)',
+                labelText: 'Email Address *',
+                hintText: 'alex@company.com',
                 prefixIcon: const Icon(Icons.email_outlined, color: PulsePathColors.violet),
                 filled: true,
                 fillColor: const Color(0xFF1E1E2E),
@@ -184,7 +186,9 @@ class _EmailAuthSheetState extends ConsumerState<EmailAuthSheet> {
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 counterText: '',
-                labelText: '6-Digit Code',
+                labelText: '6-Digit Code *',
+                hintText: '123456',
+                prefixIcon: const Icon(Icons.shield_outlined, color: PulsePathColors.violet),
                 filled: true,
                 fillColor: const Color(0xFF1E1E2E),
                 border: OutlineInputBorder(
